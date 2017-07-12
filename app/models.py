@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 from app import db
-from sqlalchemy.ext.hybrid import hybrid_property, hybrid_method
+from sqlalchemy.ext.hybrid import hybrid_property
 
 
 class Gallery(db.Model):
@@ -36,7 +36,8 @@ class Image(db.Model):
 
     @property
     def url(self):
-        return self.path.replace(os.sep, '/')
+        path_components = self.path.split(os.sep)
+        return '/'.join(path_components)
 
     def __init__(self, name, path, gallery_id):
         self.name = name,

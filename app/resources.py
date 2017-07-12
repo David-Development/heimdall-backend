@@ -1,6 +1,6 @@
 from flask_restful import Resource, reqparse, marshal_with, fields, abort
 from sqlalchemy.exc import IntegrityError
-from flask import jsonify, send_from_directory
+from flask import jsonify, send_from_directory, Flask
 from models import Gallery, Image
 from app import api, app, db
 from tasks import sync_db_from_filesystem, delete_gallery, move_images

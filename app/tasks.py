@@ -2,7 +2,6 @@ from app import db, app
 from models import Gallery, Image
 import os
 import shutil
-import time
 
 config = app.config
 
