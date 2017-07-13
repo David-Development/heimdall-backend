@@ -1,7 +1,11 @@
-from app import db, app
-from models import Gallery, Image
 import os
 import shutil
+import urllib2
+import bz2
+import sys
+
+from app import db, app, celery
+from models import Gallery, Image
 
 config = app.config
 
@@ -81,3 +85,66 @@ def move_images(gallery, images):
     for image in images:
         image_path = os.path.join(basedir, image.path)
         shutil.move(image_path, os.path.join(dest_gallery_path, image.name))
+
+
+@celery.task(bind=True)
+def download_models(self):
+    """
+    Downloads multiple pretrained models for dlib
+    :return: 
+    """
+
+    self.update_state(state='STARTED', meta={'current': 1, 'total': 2, 'status': 'Downloading Dlib Shape Predictor'})
+    response = urllib2.urlopen(config['DLIB_SHAPE_PREDICTOR_MODEL_URL'])
+    model = chunk_read(response, self, name="Dlib Shape Predictor", report_hook=chunk_report)
+
+    with open(os.path.join(config['ML_MODEL_PATH'], config['DLIB_SHAPE_PREDICTOR_MODEL']), 'w') as f:
+        self.update_state(state='STARTED',
+                          meta={'current': 1, 'total': 2, 'status': 'Unpacking Dlib Shape Predictor'})
+        model = bz2.decompress(model)
+        f.write(model)
+
+    self.update_state(state='STARTED',
+                      meta={'current': 2, 'total': 2, 'status': 'Downloading Dlib Face Descriptor Model'})
+    response = urllib2.urlopen(config['DLIB_FACE_RECOGNITION_MODEL_URL'])
+    model = chunk_read(response, self, name="Dlib Face Descriptor Model", report_hook=chunk_report)
+
+    with open(os.path.join(config['ML_MODEL_PATH'], config['DLIB_FACE_RECOGNITION_MODEL']), 'w') as f:
+        self.update_state(state='STARTED',
+                          meta={'current': 2, 'total': 2, 'status': 'Unpacking Dlib Face Descriptor Model'})
+        model = bz2.decompress(model)
+        f.write(model)
+
+    return {'current': 2, 'total': 2, 'status': 'Task completed!', 'result': 'Models downloaded'}
+
+
+def chunk_report(bytes_so_far, chunk_size, total_size, self, name):
+    percent = float(bytes_so_far) / total_size
+    percent = round(percent * 100, 2)
+    self.update_state(state='STARTED',
+                      meta={'current': percent, 'total': total_size, 'model': name, 'status': 'Downloading...'})
+    # sys.stdout.write("Downloaded %d of %d bytes (%0.2f%%)\r" %
+    #                 (bytes_so_far, total_size, percent))
+
+    # if bytes_so_far >= total_size:
+    #    sys.stdout.write('\n')
+
+
+def chunk_read(response, self, name, chunk_size=1024 * 256, report_hook=None):
+    total_size = response.info().getheader('Content-Length').strip()
+    total_size = int(total_size)
+    bytes_so_far = 0
+    data = ''
+
+    while 1:
+        chunk = response.read(chunk_size)
+        bytes_so_far += len(chunk)
+        data += chunk
+
+        if not chunk:
+            break
+
+        if report_hook:
+            report_hook(bytes_so_far, chunk_size, total_size, self, name)
+
+    return data

@@ -4,8 +4,8 @@
 *.png
 *.JPG
 migrations/
-*subjects/*
-*ml_models/*
+*subjects/*/
+*.dat
 
 # IntelliJ project files
 .idea

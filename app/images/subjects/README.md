@@ -1,0 +1,1 @@
+Folders of Images of Persons are saved in this folder

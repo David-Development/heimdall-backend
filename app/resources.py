@@ -1,9 +1,9 @@
 from flask_restful import Resource, reqparse, marshal_with, fields, abort
 from sqlalchemy.exc import IntegrityError
-from flask import jsonify, send_from_directory, Flask
+from flask import jsonify, send_from_directory, request, url_for
 from models import Gallery, Image
 from app import api, app, db
-from tasks import sync_db_from_filesystem, delete_gallery, move_images
+from tasks import sync_db_from_filesystem, delete_gallery, move_images, download_models
 import os
 
 config = app.config
@@ -136,3 +136,48 @@ def resync_db():
 @app.route('/images/<path:filename>')
 def show_images(filename):
     return send_from_directory(config['IMAGE_BASE_PATH'], filename)
+
+
+@app.route("/api/models/", methods=['GET', 'POST'])
+def check_models():
+    # Check if Models exist
+    models_path = config['ML_MODEL_PATH']
+    if request.method == 'GET':
+        dlib_shape_predictor = False
+        dlib_face_descriptor = False
+        if os.path.exists(os.path.join(models_path, config['DLIB_SHAPE_PREDICTOR_MODEL'])):
+            dlib_shape_predictor = True
+        if os.path.exists(os.path.join(models_path, config['DLIB_FACE_RECOGNITION_MODEL'])):
+            dlib_face_descriptor = True
+
+        if dlib_shape_predictor and dlib_face_descriptor:
+            return jsonify({'message': 'models found'})
+        else:
+            return jsonify({'message': 'one or more models missing'}), 409
+
+    # Post Method, download models
+    else:
+        task = download_models.apply_async()
+        task_url = url_for('taskstatus', task_id=task.id)
+        return jsonify({'message': 'download started', 'location': task_url}), 202, {'Location': task_url}
+
+
+@app.route("/status/<task_id>")
+def taskstatus(task_id):
+    task = download_models.AsyncResult(task_id)
+    response = {
+        'state': task.state,
+        'current': task.info.get('current'),
+        'total': task.info.get('total'),
+        'status': task.info.get('status', ''),
+        'model': task.info.get('model', '')
+    }
+    if 'result' in task.info:
+        response['result'] = task.info['result']
+
+    return jsonify(response)
+
+
+@app.route("/teapot")
+def teapot():
+    return jsonify({'message': 'I\'m a Teapot!'}), 418
