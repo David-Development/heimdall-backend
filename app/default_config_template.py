@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
 
 # The secret key and recaptcha public key is automatically generated when the
@@ -18,17 +19,20 @@ NEW_IMAGES_FOLDER = os.path.join(IMAGE_FOLDER, 'new')
 UNKNOWN_IMAGES_FOLDER = os.path.join(IMAGE_FOLDER, 'unknown')
 SUBJECT_IMAGES_FOLDER = os.path.join(IMAGE_FOLDER, 'subjects')
 
+ML_MODEL_PATH = os.path.join(BASEDIR, 'ml_models')
+IMAGE_BASE_PATH = os.path.join(BASEDIR, IMAGE_FOLDER)
+NEW_IMAGES_PATH = os.path.join(IMAGE_BASE_PATH, 'new')
+UNKNOWN_IMAGES_PATH = os.path.join(IMAGE_BASE_PATH, 'unknown')
+SUBJECTS_BASE_PATH = os.path.join(IMAGE_BASE_PATH, 'subjects')
+
 DLIB_SHAPE_PREDICTOR_MODEL = 'shape_predictor_68_face_landmarks.dat'
 DLIB_FACE_RECOGNITION_MODEL = 'dlib_face_recognition_resnet_model_v1.dat'
 
 DLIB_SHAPE_PREDICTOR_MODEL_URL = 'http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2'
 DLIB_FACE_RECOGNITION_MODEL_URL = 'http://dlib.net/files/dlib_face_recognition_resnet_model_v1.dat.bz2'
 
-ML_MODEL_PATH = os.path.join(BASEDIR, 'ml_models')
-IMAGE_BASE_PATH = os.path.join(BASEDIR, IMAGE_FOLDER)
-NEW_IMAGES_PATH = os.path.join(IMAGE_BASE_PATH, 'new')
-UNKNOWN_IMAGES_PATH = os.path.join(IMAGE_BASE_PATH, 'unknown')
-SUBJECTS_BASE_PATH = os.path.join(IMAGE_BASE_PATH, 'subjects')
+DLIB_SHAPE_PREDICTOR_PATH = os.path.join(ML_MODEL_PATH, DLIB_SHAPE_PREDICTOR_MODEL)
+DLIB_FACE_RECOGNITION_MODEL_PATH = os.path.join(ML_MODEL_PATH, DLIB_FACE_RECOGNITION_MODEL)
 
 WTF_CSRF_ENABLED = True
 PROPAGATE_EXCEPTIONS = True

@@ -1,10 +1,12 @@
+import os
+
 from flask_restful import Resource, reqparse, marshal_with, fields, abort
 from sqlalchemy.exc import IntegrityError
 from flask import jsonify, send_from_directory, request, url_for
+
 from models import Gallery, Image
-from app import api, app, db
-from tasks import sync_db_from_filesystem, delete_gallery, move_images, download_models
-import os
+from app import api, app, db, recognizer
+from tasks import sync_db_from_filesystem, delete_gallery, move_images, download_models, models_exist
 
 config = app.config
 
@@ -141,16 +143,8 @@ def show_images(filename):
 @app.route("/api/models/", methods=['GET', 'POST'])
 def check_models():
     # Check if Models exist
-    models_path = config['ML_MODEL_PATH']
     if request.method == 'GET':
-        dlib_shape_predictor = False
-        dlib_face_descriptor = False
-        if os.path.exists(os.path.join(models_path, config['DLIB_SHAPE_PREDICTOR_MODEL'])):
-            dlib_shape_predictor = True
-        if os.path.exists(os.path.join(models_path, config['DLIB_FACE_RECOGNITION_MODEL'])):
-            dlib_face_descriptor = True
-
-        if dlib_shape_predictor and dlib_face_descriptor:
+        if models_exist():
             return jsonify({'message': 'models found'})
         else:
             return jsonify({'message': 'one or more models missing'}), 409
@@ -181,3 +175,24 @@ def taskstatus(task_id):
 @app.route("/teapot")
 def teapot():
     return jsonify({'message': 'I\'m a Teapot!'}), 418
+
+
+@app.route("/api/recognizer/init")
+def init_recognizer():
+    if models_exist():
+        recognizer.initialize(shape_predictor_path=config['DLIB_SHAPE_PREDICTOR_PATH'],
+                              descriptor_model_path=config['DLIB_FACE_RECOGNITION_MODEL_PATH'])
+        return jsonify({'message': 'Recognizer initalized'}), 201
+    else:
+        return jsonify(
+            {'message': 'One ore more models are missing for the Recognizer to work.'}), 409
+
+
+@app.route("/api/recognizer/train")
+def train_recognizer():
+    if recognizer is None:
+        return jsonify({
+            'message': 'Recognizer not initialized. '
+                       'Please ensure that the models exist and initialize the recognizer'}), 409
+    else:
+        X, y = tasks

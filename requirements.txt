@@ -8,3 +8,12 @@ celery==4.0.2
 Flask_Script==2.0.5
 flask_appconfig==0.11.1
 redis=2.10.5
+dlib==19.4.0
+Keras==2.0.6
+numpy==1.13.1
+tensorflow-gpu==1.2.1
+h5py==2.7.0
+scikit-learn==0.18.2
+pillow==4.2.1
+
+

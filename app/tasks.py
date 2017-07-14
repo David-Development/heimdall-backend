@@ -2,10 +2,10 @@ import os
 import shutil
 import urllib2
 import bz2
-import sys
 
 from app import db, app, celery
 from models import Gallery, Image
+#from app.recognition import utils
 
 config = app.config
 
@@ -148,3 +148,20 @@ def chunk_read(response, self, name, chunk_size=1024 * 256, report_hook=None):
             report_hook(bytes_so_far, chunk_size, total_size, self, name)
 
     return data
+
+
+def models_exist():
+    models_path = config['ML_MODEL_PATH']
+    dlib_shape_predictor = False
+    dlib_face_descriptor = False
+    if os.path.exists(os.path.join(models_path, config['DLIB_SHAPE_PREDICTOR_MODEL'])):
+        dlib_shape_predictor = True
+    if os.path.exists(os.path.join(models_path, config['DLIB_FACE_RECOGNITION_MODEL'])):
+        dlib_face_descriptor = True
+
+    return dlib_shape_predictor and dlib_face_descriptor
+
+
+#def prepare_data():
+ #   X, y, folder_names = utils.load_dataset(config['SUBJECTS_BASE_PATH'])
+
