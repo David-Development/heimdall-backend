@@ -4,8 +4,9 @@ from dlib import shape_predictor, face_recognition_model_v1
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import GridSearchCV
+import numpy as np
 
-from . import detector
+from . import detector, utils
 
 
 class Recognizer:
@@ -23,6 +24,7 @@ class Recognizer:
         self.clf_trained = None
         self.n_jobs = None
         self.clf = None
+        self.initialized = False
 
     def initialize(self, shape_predictor_path, descriptor_model_path, classifier="SVM", n_jobs=1, k=5):
         self.shape_predictor = shape_predictor(shape_predictor_path)
@@ -42,9 +44,10 @@ class Recognizer:
             self.clf = KNeighborsClassifier(k=self.k, n_jobs=n_jobs)
         else:
             self.clf = SVC(C=10, gamma=1, kernel='rbf', probability=True)
-        pass
 
-    def train_recognizer(self):
+        self.initialized = True
+
+    def train_recognizer(self, progress_hook=None, celery_binding=None):
         """
         Trains the Classifier
         :return: 
@@ -53,17 +56,22 @@ class Recognizer:
         transformed = []
         labels = []
         no_face = 0
+        total_images = len(self.X)
+        i = 0
         for data in zip(self.X, self.y):
             image = data[0]
             label = data[1]
+            i += 1
             descriptors, _ = self.extract_descriptors(image)
-
+            if progress_hook is not None:
+                progress_hook(i, total_images, False, celery_binding)
             if len(descriptors) != 0:
-                transformed.append(descriptors)
+                for descriptor in descriptors:
+                    transformed.append(descriptor)
                 labels.append(label)
             else:
                 no_face += 1
-
+        progress_hook(total_images, total_images, True, celery_binding, )
         self.train_classifier(transformed, labels)
 
     def train_classifier(self, descriptors, labels):
@@ -77,7 +85,7 @@ class Recognizer:
         :return: 
         """
 
-        if not self.clf_trained:
+        if self.clf_trained:
             descriptors, bbs = self.extract_descriptors(image)
 
             results = []
@@ -85,6 +93,8 @@ class Recognizer:
                 if self.clf_type is "kNN" and dists:
                     results.append(self.clf.kneighbors(self.k))
                 else:
+                    descriptor = np.asarray(descriptor)
+                    descriptor.reshape(1, -1)
                     results.append(self.clf.predict_proba(descriptor))
 
             return results, bbs
@@ -118,7 +128,6 @@ class Recognizer:
         for face in faces:
             shape = self.shape_predictor(image, face)
             descriptors.append(self.recognition_model.compute_face_descriptor(image, shape))
-
         return descriptors, faces
 
     def check_data(self):
