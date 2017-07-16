@@ -1,12 +1,15 @@
 import os
+import glob
 
 from flask_restful import Resource, reqparse, marshal_with, fields, abort
 from sqlalchemy.exc import IntegrityError
 from flask import jsonify, send_from_directory, request, url_for
 
 from models import Gallery, Image
-from app import api, app, db, recognizer
-from tasks import sync_db_from_filesystem, delete_gallery, move_images, download_models, models_exist
+from app import api, app, db, recognizer, clf
+from recognition import utils
+from tasks import (sync_db_from_filesystem, delete_gallery, move_images, download_models, models_exist,
+                   train_recognizer, load_classifier, classify)
 
 config = app.config
 
@@ -152,12 +155,12 @@ def check_models():
     # Post Method, download models
     else:
         task = download_models.apply_async()
-        task_url = url_for('taskstatus', task_id=task.id)
+        task_url = url_for('model_download_status', task_id=task.id)
         return jsonify({'message': 'download started', 'location': task_url}), 202, {'Location': task_url}
 
 
-@app.route("/status/<task_id>")
-def taskstatus(task_id):
+@app.route("/api/models/status/<task_id>")
+def model_download_status(task_id):
     task = download_models.AsyncResult(task_id)
     response = {
         'state': task.state,
@@ -189,10 +192,42 @@ def init_recognizer():
 
 
 @app.route("/api/recognizer/train")
-def train_recognizer():
-    if recognizer is None:
-        return jsonify({
-            'message': 'Recognizer not initialized. '
-                       'Please ensure that the models exist and initialize the recognizer'}), 409
-    else:
-        X, y = tasks
+def training_recognizer():
+    task = train_recognizer.apply_async()
+    task_url = url_for('recognizer_training_status', task_id=task.id)
+    return jsonify({'message': 'Training started', 'location': task_url}), 202, {'Location': task_url}
+
+
+@app.route("/api/recognizer/classify/<image_id>")
+def classify_db_image(image_id):
+    image = Image.query.filter_by(id=image_id).first()
+    image_path = os.path.join(config['BASEDIR'], image.path)
+    image = utils.load_image(image_path)
+    results, bbs = classify(app.clf, image)
+    print results
+
+
+@app.route("/api/recognizer/train/status/<task_id>")
+def recognizer_training_status(task_id):
+    task = train_recognizer.AsyncResult(task_id)
+    response = {
+        'state': task.state,
+        'current_image': task.info.get('current_image'),
+        'total_images': task.info.get('total_images'),
+        'step': task.info.get('step', ''),
+        'model': task.info.get('model', '')
+    }
+    if 'result' in task.info:
+        response['result'] = task.info['result']
+
+    return jsonify(response)
+
+
+@app.route("/api/classifier/load", methods=['POST'])
+def load_new_classifier():
+    path = config['ML_MODEL_PATH'] + os.sep + '*.pkl'
+    print path
+    latest_model = max(glob.glob(path), key=os.path.getctime)
+    app.clf = load_classifier(latest_model)
+
+    return jsonify({'message': 'new model loaded into classifier'}), 201

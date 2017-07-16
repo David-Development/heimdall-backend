@@ -5,6 +5,7 @@
 *.JPG
 migrations/
 *subjects/*/
+!*subjects/unknown
 *.dat
 
 # IntelliJ project files

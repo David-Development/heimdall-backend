@@ -47,6 +47,6 @@ class FaceDetector:
 
     def dlib_predict(self, image):
         if image.shape[0] <= 150:
-            return [utils.dlib2cv(face) for face in self.model(image, 1)]
+            return [face for face in self.model(image, 1)]
         else:
-            return [utils.dlib2cv(face) for face in self.model(image)]
+            return [face for face in self.model(image)]

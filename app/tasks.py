@@ -2,10 +2,22 @@ import os
 import shutil
 import urllib2
 import bz2
+import time
 
-from app import db, app, celery
+import multiprocessing
+
+import requests
+from flask import url_for
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import GridSearchCV
+from sklearn.externals import joblib
+import numpy as np
+
+from app import db, app, celery, recognizer
 from models import Gallery, Image
-#from app.recognition import utils
+
+from recognition import utils
 
 config = app.config
 
@@ -14,11 +26,15 @@ def sync_db_from_filesystem():
     clear_files_from_db()
     # start with new and unknown images
     create_and_populate_gallery(config['IMAGE_BASE_PATH'], 'new', False)
-    create_and_populate_gallery(config['IMAGE_BASE_PATH'], 'unknown', False)
+    # create_and_populate_gallery(config['SUBJECTS_BASE_PATH'], 'unknown', False)
 
     # and the subjects
     for gallery_folder in os.listdir(config['SUBJECTS_BASE_PATH']):
-        create_and_populate_gallery(config['SUBJECTS_BASE_PATH'], gallery_folder)
+        if os.path.isdir(os.path.join(config['SUBJECTS_BASE_PATH'], gallery_folder)):
+            if gallery_folder == 'unknown':
+                create_and_populate_gallery(config['SUBJECTS_BASE_PATH'], gallery_folder, False)
+            else:
+                create_and_populate_gallery(config['SUBJECTS_BASE_PATH'], gallery_folder)
 
 
 def create_and_populate_gallery(base_path, gallery_name, subject_gallery=True):
@@ -33,7 +49,9 @@ def create_and_populate_gallery(base_path, gallery_name, subject_gallery=True):
     db.session.add(gallery)
     db.session.commit()
     for file_path in os.listdir(gallery_path):
-        db.session.add(Image(name=file_path, gallery_id=gallery.id, path=os.path.join(gallery_folder, file_path)))
+        _, ext = os.path.splitext(file_path)
+        if str(ext).lower() in ['.png', '.jpg', '.jpeg']:
+            db.session.add(Image(name=file_path, gallery_id=gallery.id, path=os.path.join(gallery_folder, file_path)))
     db.session.commit()
 
 
@@ -95,6 +113,7 @@ def download_models(self):
     """
 
     self.update_state(state='STARTED', meta={'current': 1, 'total': 2, 'status': 'Downloading Dlib Shape Predictor'})
+    print config['DLIB_SHAPE_PREDICTOR_MODEL_URL']
     response = urllib2.urlopen(config['DLIB_SHAPE_PREDICTOR_MODEL_URL'])
     model = chunk_read(response, self, name="Dlib Shape Predictor", report_hook=chunk_report)
 
@@ -162,6 +181,102 @@ def models_exist():
     return dlib_shape_predictor and dlib_face_descriptor
 
 
-#def prepare_data():
- #   X, y, folder_names = utils.load_dataset(config['SUBJECTS_BASE_PATH'])
+@celery.task(bind=True)
+def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5):
+    classifier = create_classifier(clf_type, n_jobs, k)
+    X, y, folder_names = utils.load_dataset(config['SUBJECTS_BASE_PATH'], grayscale=False)
+    i = 0
+    no_face = 0
+    transformed = []
+    labels = []
+    for data in zip(X, y):
+        image = data[0]
+        label = data[1]
+        i += 1
+        descriptors, _ = recognizer.extract_descriptors(image)
+        if len(descriptors) != 0:
+            for descriptor in descriptors:
+                transformed.append(descriptor)
+                labels.append(label)
+        else:
+            no_face += 1
 
+    classifier.fit(transformed, labels)
+
+    timestamp = time.strftime('%Y%m%d%H%M%S')
+    filename = clf_type + timestamp + '.pkl'
+    save_classifier(classifier, os.path.join(config['ML_MODEL_PATH'], filename))
+    with app.app_context():
+        url = url_for('load_new_classifier', _external=True)
+    print url
+    requests.post(url)
+
+    return {'current_image': len(X), 'total_images': len(X), 'step': 'Training',
+            'result': 'Training finished'}
+
+
+def training_progress_hook(current_image, total_images, training, celery_binding):
+    step = "Generating descriptors..."
+    if training:
+        step = "Training..."
+
+    celery_binding.update_state(state='STARTED',
+                                meta={'current_image': current_image, 'total_images': total_images,
+                                      'step': step})
+
+
+def create_classifier(clf_type="SVM", n_jobs=-1, k=5):
+    if n_jobs == -1:
+        n_jobs = multiprocessing.cpu_count()
+
+    if clf_type is "kNN":
+        classifier = KNeighborsClassifier(k=k, n_jobs=n_jobs)
+    else:
+        classifier = SVC(C=10, gamma=1, kernel='rbf', probability=True)
+
+    return classifier
+
+
+def load_classifier(path):
+    return joblib.load(path)
+
+
+def save_classifier(classifier, path):
+    joblib.dump(classifier, path)
+
+
+def grid_search(X, y, classifier, param_grid, n_jobs=-1):
+    """
+    Perform gridsearch for internal classifier and apply best parameters
+    :param X: Array of feature vectors 
+    :param y: Corresponding labels
+    :param classifier: The classifier 
+    :param n_jobs: Number of processes to use for the gridsearch
+    :param param_grid: appropriate parameter grid for the internal classifier
+    Example for SVM:
+    kernels = ['linear', 'rbf']
+    Cs = [0.001, 0.01, 0.1, 1, 10, 100]
+    gammas = [0.001, 0.01, 0.1, 1, 10, 100]
+    param_grid = {'C': Cs, 'gamma': gammas, 'kernel': kernels}
+    :return: 
+    """
+    if n_jobs == -1:
+        n_jobs = multiprocessing.cpu_count()
+    grid_cv = GridSearchCV(classifier, param_grid=param_grid, n_jobs=n_jobs)
+    grid_cv.fit(X, y)
+    return grid_cv.best_estimator_
+
+
+def classify(classifier, image, dists=False, neighbors=None):
+    descriptors, bbs = recognizer.extract_descriptors(image)
+
+    results = []
+    for descriptor in descriptors:
+        if isinstance(classifier, KNeighborsClassifier) and dists:
+            results.append(classifier.kneighbors(neighbors))
+        else:
+            descriptor = np.asarray(descriptor)
+            descriptor.reshape(1, -1)
+            results.append(classifier.predict_proba(descriptor))
+
+    return results, bbs

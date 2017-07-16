@@ -18,7 +18,6 @@ def load_dataset(path, grayscale=True, pil=False):
             subject_path = os.path.join(dirname, subdirname)
             for filename in os.listdir(subject_path):
                 if not filename.endswith('.md') and os.path.isfile(os.path.join(subject_path, filename)):
-                    print filename
                     if pil:
                         im = Image.open(os.path.join(subject_path, filename))
                         if grayscale:
@@ -37,6 +36,15 @@ def load_dataset(path, grayscale=True, pil=False):
                     y.append(c)
             c += 1
     return [X, y, folder_names]
+
+
+def load_image(path, grayscale=False):
+    im = cv2.imread(path)
+    if grayscale:
+        im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+    else:
+        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+    return im
 
 
 def dlib2cv(rect):
@@ -113,3 +121,7 @@ def write_images_to_folder(images, labels, folder_name):
 
 def to_vector_list(X):
     return [np.ravel(x) for x in X]
+
+
+def create_label_dict(y, labels):
+    return dict(zip(list(xrange(max(y) + 1)), labels))
