@@ -3,21 +3,22 @@ import shutil
 import urllib2
 import bz2
 import time
-
+import datetime
+import cPickle as pickle
 import multiprocessing
 
 import requests
 from flask import url_for
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, cross_val_score
 from sklearn.externals import joblib
 import numpy as np
 
 from app import db, app, celery, recognizer
-from models import Gallery, Image
+from models import Gallery, Image, ClassifierStats, Labels
 
-from recognition import utils
+from recognition import utils, augmenter
 
 config = app.config
 
@@ -182,17 +183,24 @@ def models_exist():
 
 
 @celery.task(bind=True)
-def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5):
+def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
     classifier = create_classifier(clf_type, n_jobs, k)
     X, y, folder_names = utils.load_dataset(config['SUBJECTS_BASE_PATH'], grayscale=False)
+    X, y = augment_images(X, y, target=config['NUM_TARGET_IMAGES'], celery_binding=self)
+    label_dict = utils.create_label_dict(y, folder_names)
+    total_images = len(y)
     i = 0
     no_face = 0
+    cv_score = None
     transformed = []
     labels = []
     for data in zip(X, y):
         image = data[0]
         label = data[1]
         i += 1
+        self.update_state(state='STARTED',
+                          meta={'current': i, 'total': total_images,
+                                'step': 'Transforming'})
         descriptors, _ = recognizer.extract_descriptors(image)
         if len(descriptors) != 0:
             for descriptor in descriptors:
@@ -201,18 +209,70 @@ def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5):
         else:
             no_face += 1
 
+    print no_face
+
+    self.update_state(state='STARTED',
+                      meta={'current': total_images, 'total': total_images,
+                            'step': 'Scoring'})
+    cv_score = np.mean(cross_val_score(classifier, transformed, labels, cv=5, n_jobs=n_jobs))
+
+    self.update_state(state='STARTED',
+                      meta={'current': total_images, 'total': total_images,
+                            'step': 'Training'})
     classifier.fit(transformed, labels)
 
     timestamp = time.strftime('%Y%m%d%H%M%S')
     filename = clf_type + timestamp + '.pkl'
-    save_classifier(classifier, os.path.join(config['ML_MODEL_PATH'], filename))
+    path = os.path.join(config['ML_MODEL_PATH'], filename)
+
+    stats = ClassifierStats(name=clf_type + timestamp, classifier_type=clf_type, model_path=path,
+                            date=datetime.datetime.now(), cv_score=cv_score)
+    db.session.add(stats)
+    # flush to generate stats id
+    db.session.flush()
+
+    for key, value in label_dict.iteritems():
+        label_entry = Labels(clf_id=stats.id, num=key, label=value)
+        db.session.add(label_entry)
+
+    db.session.commit()
+    save_classifier(classifier, path)
+
     with app.app_context():
         url = url_for('load_new_classifier', _external=True)
-    print url
     requests.post(url)
 
-    return {'current_image': len(X), 'total_images': len(X), 'step': 'Training',
+    return {'current': total_images, 'total': total_images, 'step': 'Training',
             'result': 'Training finished'}
+
+
+def augment_images(X, y, target, celery_binding):
+    unq, unq_inv, unq_cnt = np.unique(y, return_inverse=True, return_counts=True)
+    unique_class_indices = np.split(np.argsort(unq_inv), np.cumsum(unq_cnt[:-1]))
+    y = np.asarray(y)
+    X = np.stack(X)
+    target_x = []
+    target_y = []
+    for unique_class in unq:
+        indices = unique_class_indices[unique_class]
+        diff = target - len(indices)
+        # less images than desired
+        tmp_x = []
+        tmp_y = []
+        celery_binding.update_state(state='STARTED',
+                                    meta={'current': unique_class + 1, 'total': len(unique_class_indices),
+                                          'step': 'Augmenting'})
+        # Augment until target-len(indices) are generated
+        # Keras can't augment more images than it has received, so the process needs to be done multiple
+        # times
+        while diff > 0:
+            batch_x, batch_y = augmenter.augment_array_target(X[indices], y[indices], diff)
+            tmp_x.extend(batch_x)
+            tmp_y.extend(batch_y)
+            diff = target - len(tmp_x)
+        target_x.extend(tmp_x)
+        target_y.extend(tmp_y)
+    return target_x, target_y
 
 
 def training_progress_hook(current_image, total_images, training, celery_binding):
@@ -272,11 +332,12 @@ def classify(classifier, image, dists=False, neighbors=None):
 
     results = []
     for descriptor in descriptors:
+
         if isinstance(classifier, KNeighborsClassifier) and dists:
             results.append(classifier.kneighbors(neighbors))
         else:
             descriptor = np.asarray(descriptor)
-            descriptor.reshape(1, -1)
-            results.append(classifier.predict_proba(descriptor))
+            descriptor = descriptor.reshape(1, -1)
+            results.append(classifier.predict_proba(descriptor)[0])
 
     return results, bbs

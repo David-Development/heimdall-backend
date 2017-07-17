@@ -1,1 +1,0 @@
-Images of unknown subjects are saved in this folder

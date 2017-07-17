@@ -38,6 +38,24 @@ class Augmenter:
         self.logger.info("end augmentation, generated {} images in {} seconds".format(len(x_labels), time() - start))
         return x_data, x_labels
 
+    def augment_array_target(self, images, labels, target):
+        color = True
+        x_data = []
+        x_labels = []
+
+        if images.ndim is 3:
+            images = images[:, :, :, np.newaxis]
+            color = False
+
+        d, l = self.generator.flow(images, labels, batch_size=target).next()
+        # remove dummy color channel
+        if not color:
+            d = d[:, :, :, 0]
+
+        x_data.extend(d.astype(np.uint8))
+        x_labels.extend(l)
+        return x_data, x_labels
+
     def augment_array(self, images, labels, epochs, save_to_dir=None):
         color = True
         x_data = []

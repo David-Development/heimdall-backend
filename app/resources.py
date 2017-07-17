@@ -4,9 +4,10 @@ import glob
 from flask_restful import Resource, reqparse, marshal_with, fields, abort
 from sqlalchemy.exc import IntegrityError
 from flask import jsonify, send_from_directory, request, url_for
+import numpy as np
 
-from models import Gallery, Image
-from app import api, app, db, recognizer, clf
+from models import Gallery, Image, ClassifierStats
+from app import api, app, db, recognizer, clf, labels
 from recognition import utils
 from tasks import (sync_db_from_filesystem, delete_gallery, move_images, download_models, models_exist,
                    train_recognizer, load_classifier, classify)
@@ -191,7 +192,7 @@ def init_recognizer():
             {'message': 'One ore more models are missing for the Recognizer to work.'}), 409
 
 
-@app.route("/api/recognizer/train")
+@app.route("/api/recognizer/train/")
 def training_recognizer():
     task = train_recognizer.apply_async()
     task_url = url_for('recognizer_training_status', task_id=task.id)
@@ -203,8 +204,26 @@ def classify_db_image(image_id):
     image = Image.query.filter_by(id=image_id).first()
     image_path = os.path.join(config['BASEDIR'], image.path)
     image = utils.load_image(image_path)
+
     results, bbs = classify(app.clf, image)
-    print results
+
+    predictions = []
+    # Jedes erkannte Gesicht
+    for faces in results:
+        # Das wahrscheinlichste Ergebnis
+        highest = np.argmax(faces)
+        prediction_dict = {}
+        prediction_result_dict = {'highest': app.labels[highest]}
+        # Alle Wahrscheinlichkeiten
+        for idx, prediction in enumerate(faces):
+            prediction_dict[app.labels[idx]] = prediction
+        prediction_result_dict['probabilities'] = prediction_dict
+
+        predictions.append(prediction_result_dict)
+
+    return jsonify({'message:': 'classification complete',
+                    'predictions:': predictions,
+                    'bounding_boxes': bbs})
 
 
 @app.route("/api/recognizer/train/status/<task_id>")
@@ -212,8 +231,8 @@ def recognizer_training_status(task_id):
     task = train_recognizer.AsyncResult(task_id)
     response = {
         'state': task.state,
-        'current_image': task.info.get('current_image'),
-        'total_images': task.info.get('total_images'),
+        'current': task.info.get('current'),
+        'total': task.info.get('total'),
         'step': task.info.get('step', ''),
         'model': task.info.get('model', '')
     }
@@ -223,11 +242,12 @@ def recognizer_training_status(task_id):
     return jsonify(response)
 
 
-@app.route("/api/classifier/load", methods=['POST'])
+@app.route("/api/classifier/load/", methods=['POST'])
 def load_new_classifier():
     path = config['ML_MODEL_PATH'] + os.sep + '*.pkl'
-    print path
     latest_model = max(glob.glob(path), key=os.path.getctime)
     app.clf = load_classifier(latest_model)
+    db_model = ClassifierStats.query.order_by(ClassifierStats.date.desc()).first()
+    app.labels = db_model.labels_as_dict()
 
     return jsonify({'message': 'new model loaded into classifier'}), 201

@@ -25,6 +25,7 @@ celery.conf.update(app.config)
 from tasks import sync_db_from_filesystem
 
 clf = tasks.create_classifier()
+labels = {}
 from app import models, resources
 
 if app.config['SYNC_IMAGES_ON_START']:

@@ -13,28 +13,29 @@ def load_dataset(path, grayscale=True, pil=False):
     X, y, folder_names = [], [], []
     for dirname, dirnames, filenames in os.walk(path):
         for subdirname in dirnames:
-
-            folder_names.append(subdirname)
             subject_path = os.path.join(dirname, subdirname)
-            for filename in os.listdir(subject_path):
-                if not filename.endswith('.md') and os.path.isfile(os.path.join(subject_path, filename)):
-                    if pil:
-                        im = Image.open(os.path.join(subject_path, filename))
-                        if grayscale:
-                            im = im.convert("L")
-                    else:
-                        im = cv2.imread(os.path.join(subject_path, filename))
-                        if grayscale:
-                            im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+            # Ignore empty folders
+            if len(os.listdir(subject_path)) > 0:
+                folder_names.append(subdirname)
+                for filename in os.listdir(subject_path):
+                    if not filename.endswith('.md') and os.path.isfile(os.path.join(subject_path, filename)):
+                        if pil:
+                            im = Image.open(os.path.join(subject_path, filename))
+                            if grayscale:
+                                im = im.convert("L")
                         else:
-                            # use a sane color order
-                            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
-                    im = np.asarray(im, dtype=np.uint8)
-                    im.setflags(write=True)
-                    X.append(im)
-                    # y.append(subdirname + "_" + os.path.splitext(filename)[0])
-                    y.append(c)
-            c += 1
+                            im = cv2.imread(os.path.join(subject_path, filename))
+                            if grayscale:
+                                im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+                            else:
+                                # use a sane color order
+                                im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+                        im = np.asarray(im, dtype=np.uint8)
+                        im.setflags(write=True)
+                        X.append(im)
+                        # y.append(subdirname + "_" + os.path.splitext(filename)[0])
+                        y.append(c)
+                c += 1
     return [X, y, folder_names]
 
 

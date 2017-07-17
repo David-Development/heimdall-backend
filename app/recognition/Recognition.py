@@ -1,5 +1,5 @@
 from dlib import shape_predictor, face_recognition_model_v1
-from . import detector
+from . import detector, utils
 
 
 class Recognizer:
@@ -16,7 +16,9 @@ class Recognizer:
         """
         faces = detector.detect(image)
         descriptors = []
+        bbs = []
         for face in faces:
             shape = self.shape_predictor(image, face)
             descriptors.append(self.recognition_model.compute_face_descriptor(image, shape))
-        return descriptors, faces
+            bbs.append(utils.dlib2cv(face))
+        return descriptors, bbs

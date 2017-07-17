@@ -1,1 +1,2 @@
-Folders of Images of Persons are saved in this folder
+Folders of Images of persons are saved in this folder  
+The unknown Folder is fixed and reserved for images of unknown persons

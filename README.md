@@ -52,8 +52,9 @@ redis available under `0.0.0.0:6379`
 **TODO**  
 - Dataset Loading. Change Path of unknown images or change loading code [DONE]
 - Training of Recognizer as celery background task [DONE]
-- Save label dictionary after training in database/somewhere
-- Return useful information after classification
+- Save label dictionary after training in database/somewhere [DONE]
+- Return useful information after classification [DONE]
+- Class-individual augmentation to target number of images [DONE]
 - Cross-validation for score of current model (background task)
 - List of running tasks, their ids/urls and types (API-Endpoint)
 - Replace TF/Keras Dependency with custom or independent library for image augmentation

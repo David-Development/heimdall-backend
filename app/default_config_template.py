@@ -26,6 +26,8 @@ NEW_IMAGES_PATH = os.path.join(IMAGE_BASE_PATH, 'new')
 SUBJECTS_BASE_PATH = os.path.join(IMAGE_BASE_PATH, 'subjects')
 UNKNOWN_IMAGES_PATH = os.path.join(SUBJECTS_BASE_PATH, 'unknown')
 
+NUM_TARGET_IMAGES = 50
+
 DLIB_SHAPE_PREDICTOR_MODEL = 'shape_predictor_68_face_landmarks.dat'
 DLIB_FACE_RECOGNITION_MODEL = 'dlib_face_recognition_resnet_model_v1.dat'
 
