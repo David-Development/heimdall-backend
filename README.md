@@ -49,13 +49,44 @@ redis available under `0.0.0.0:6379`
 `celery worker -A app.celery --loglevel=info`
 
 
-**TODO**  
-- Dataset Loading. Change Path of unknown images or change loading code [DONE]
-- Training of Recognizer as celery background task [DONE]
-- Save label dictionary after training in database/somewhere [DONE]
-- Return useful information after classification [DONE]
-- Class-individual augmentation to target number of images [DONE]
-- Cross-validation for score of current model (background task)
-- List of running tasks, their ids/urls and types (API-Endpoint)
-- Replace TF/Keras Dependency with custom or independent library for image augmentation
-- Run FaceDetection on each subject and unknown image and save bounding box in database
+**TODO**
+- Backend
+    - Dataset Loading. Change Path of unknown images or change loading code [DONE]
+    - Training of Recognizer as celery background task [DONE]
+    - Save label dictionary after training in database/somewhere [DONE]
+    - Return useful information after classification [DONE]
+    - Class-individual augmentation to target number of images [DONE]
+    - Cross-validation for score of current model (background task) [DONE]
+    - Save more info of model after training
+        - Number of images 
+        - Average number of base images per class
+        - Number of images without a found face
+    - Hook up background tasks to socket.io channels
+    - Refactor App
+        - Pull code out of \__init\__.py
+    - Save last classifications (image and classification result (gallery))
+    - Include socket endpoint for camera input
+    - Create socket.io endpoint for classification output
+        - Draw bounding box in image, with classification result
+    - List of running tasks, their ids/urls and types (API-Endpoint)
+    - Replace TF/Keras Dependency with custom or independent library for image augmentation
+    - Run FaceDetection on each subject and unknown image and save bounding box in database
+- Frontend
+    - Index Page
+    - Navigation Bar
+    - Gallery overview
+        - Create new Gallery
+        - Show Gallery
+        - Move images 
+    - live classification view (hook up to socket.io endpoint for classification output)
+    - show last classifications
+        - mark classification as wrong
+            - is unknown -> to unknown
+            - is subject -> to subject gallery
+    - upload image and classify it
+    - show running tasks
+    - show stats of current model
+        - retrain model
+            
+            
+    

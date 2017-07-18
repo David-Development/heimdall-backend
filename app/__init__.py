@@ -3,6 +3,7 @@ import os
 from flask import Flask
 from flask_appconfig import AppConfig
 from flask_restful import Api
+from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
 
 from celery import Celery
@@ -15,6 +16,9 @@ app = Flask(__name__)
 api = Api(app)
 AppConfig(app, os.path.join(basedir, 'default_config.py'))
 db = SQLAlchemy(app)
+
+# turn the flask app into a socketio app
+socketio = SocketIO(app)
 
 recognizer = Recognizer(shape_predictor_path=app.config['DLIB_SHAPE_PREDICTOR_PATH'],
                         descriptor_model_path=app.config['DLIB_FACE_RECOGNITION_MODEL_PATH'])

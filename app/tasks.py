@@ -256,7 +256,6 @@ def augment_images(X, y, target, celery_binding):
     for unique_class in unq:
         indices = unique_class_indices[unique_class]
         diff = target - len(indices)
-        # less images than desired
         tmp_x = []
         tmp_y = []
         celery_binding.update_state(state='STARTED',
@@ -264,7 +263,7 @@ def augment_images(X, y, target, celery_binding):
                                           'step': 'Augmenting'})
         # Augment until target-len(indices) are generated
         # Keras can't augment more images than it has received, so the process needs to be done multiple
-        # times
+        # times, if less images than diff are available
         while diff > 0:
             batch_x, batch_y = augmenter.augment_array_target(X[indices], y[indices], diff)
             tmp_x.extend(batch_x)
