@@ -5,9 +5,11 @@ import bz2
 import time
 import datetime
 import multiprocessing
+import socket
 
 import requests
 from flask import url_for
+from flask_socketio import SocketIO
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import GridSearchCV, cross_val_score
@@ -353,5 +355,33 @@ def classify(classifier, image, dists=False, neighbors=None):
     return results, bbs
 
 
+@celery.task
 def run_camera_socket():
-    thread.run()
+    socketio = SocketIO(message_queue='redis://')
+    host = app.config['CAMERA_SOCKET_HOST']
+    port = app.config['CAMERA_SOCKET_PORT']
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+    try:
+        s.bind((host, port))
+    except socket.error as msg:
+        print 'Socket binding failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
+
+    s.listen(5)
+    print 'Socket binding complete, waiting for image'
+    while True:
+        conn, addr = s.accept()
+        print 'Connected with ' + addr[0] + ':' + str(addr[1])
+        image = ''
+        while True:
+            data = conn.recv(4096)
+            if not data:
+                break
+            image += data
+
+        image = image.decode("hex").encode("base64")
+        filename = str(time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())) + '.jpg'
+        new_image(image, filename)
+        print filename
+        socketio.emit('new_image', {'image': image})
