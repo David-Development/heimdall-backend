@@ -6,17 +6,17 @@ import time
 import datetime
 import multiprocessing
 import socket
+import base64
 
 import requests
-from flask import url_for
-from flask_socketio import SocketIO
+from flask import url_for, json
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import GridSearchCV, cross_val_score
 from sklearn.externals import joblib
 import numpy as np
 
-from app import db, app, celery, recognizer
+from app import db, app, celery, recognizer, socketio, clf
 from models import Gallery, Image, ClassifierStats, Labels
 
 from recognition import utils, augmenter
@@ -62,11 +62,12 @@ def new_image(image, filename):
     new_gallery = Gallery.query.filter_by(name='new').first()
 
     with open(path, 'wb') as f:
-        f.write(image.decode('base64'))
-
-    db.session.add(
-        Image(name=filename, gallery_id=new_gallery.id, path=os.path.join(config['NEW_IMAGES_FOLDER'], filename)))
+        f.write(base64.b64decode(image))
+    image = Image(name=filename, gallery_id=new_gallery.id, path=os.path.join(config['NEW_IMAGES_FOLDER'], filename))
+    db.session.add(image)
     db.session.commit()
+
+    return image.id
 
 
 def clear_files_from_db():
@@ -357,7 +358,6 @@ def classify(classifier, image, dists=False, neighbors=None):
 
 @celery.task
 def run_camera_socket():
-    socketio = SocketIO(message_queue='redis://')
     host = app.config['CAMERA_SOCKET_HOST']
     port = app.config['CAMERA_SOCKET_PORT']
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -380,8 +380,13 @@ def run_camera_socket():
                 break
             image += data
 
-        image = image.decode("hex").encode("base64")
+        image = base64.b64encode(image.decode("hex"))
+
         filename = str(time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())) + '.jpg'
-        new_image(image, filename)
-        print filename
-        socketio.emit('new_image', {'image': image})
+        id = new_image(image, filename)
+        with app.app_context():
+            url = url_for('classify_db_image', image_id=id, _external=True)
+        r = requests.get(url)
+        result = r.json()
+        socketio.emit('new_image', {'image': image,
+                                    'classification': json.dumps(result)})
