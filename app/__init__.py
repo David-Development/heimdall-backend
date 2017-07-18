@@ -1,4 +1,5 @@
 import os
+from threading import Event
 
 from flask import Flask
 from flask_appconfig import AppConfig
@@ -9,6 +10,7 @@ from flask_sqlalchemy import SQLAlchemy
 from celery import Celery
 
 from recognition import Recognizer
+
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -27,6 +29,10 @@ celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
 celery.conf.update(app.config)
 
 from tasks import sync_db_from_filesystem
+
+from camerathread import CameraThread
+thread = CameraThread(app.config['CAMERA_SOCKET_HOST'], app.config['CAMERA_SOCKET_PORT'])
+thread_stop_event = Event()
 
 clf = tasks.create_classifier()
 labels = {}

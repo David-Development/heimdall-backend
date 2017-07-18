@@ -39,7 +39,7 @@ class Image(db.Model):
         path_components = self.path.split(os.sep)
         return '/'.join(path_components)
 
-    def __init__(self, name, path, gallery_id):
+    def __init__(self, name, path, gallery_id=None):
         self.name = name
         self.path = path
         self.gallery_id = gallery_id

@@ -4,7 +4,6 @@ import urllib2
 import bz2
 import time
 import datetime
-import cPickle as pickle
 import multiprocessing
 
 import requests
@@ -53,6 +52,18 @@ def create_and_populate_gallery(base_path, gallery_name, subject_gallery=True):
         _, ext = os.path.splitext(file_path)
         if str(ext).lower() in ['.png', '.jpg', '.jpeg']:
             db.session.add(Image(name=file_path, gallery_id=gallery.id, path=os.path.join(gallery_folder, file_path)))
+    db.session.commit()
+
+
+def new_image(image, filename):
+    path = os.path.join(config['NEW_IMAGES_PATH'], filename)
+    new_gallery = Gallery.query.filter_by(name='new').first()
+
+    with open(path, 'wb') as f:
+        f.write(image.decode('base64'))
+
+    db.session.add(
+        Image(name=filename, gallery_id=new_gallery.id, path=os.path.join(config['NEW_IMAGES_FOLDER'], filename)))
     db.session.commit()
 
 
@@ -340,3 +351,7 @@ def classify(classifier, image, dists=False, neighbors=None):
             results.append(classifier.predict_proba(descriptor)[0])
 
     return results, bbs
+
+
+def run_camera_socket():
+    thread.run()

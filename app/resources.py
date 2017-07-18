@@ -1,13 +1,15 @@
 import os
 import glob
 
+
 from flask_restful import Resource, reqparse, marshal_with, fields, abort
 from sqlalchemy.exc import IntegrityError
 from flask import jsonify, send_from_directory, request, url_for
 import numpy as np
+from flask_socketio import send, emit
 
 from models import Gallery, Image, ClassifierStats
-from app import api, app, db, recognizer, clf, labels
+from app import api, app, db, recognizer, clf, labels, socketio
 from recognition import utils
 from tasks import (sync_db_from_filesystem, delete_gallery, move_images, download_models, models_exist,
                    train_recognizer, load_classifier, classify)
@@ -130,7 +132,7 @@ api.add_resource(ImageListRes, '/api/images/')
 
 @app.route("/")
 def hello_world():
-    return "hello_world"
+    return "index"
 
 
 @app.route("/api/resync")
@@ -251,3 +253,13 @@ def load_new_classifier():
     app.labels = db_model.labels_as_dict()
 
     return jsonify({'message': 'new model loaded into classifier'}), 201
+
+
+@socketio.on('connect')
+def connect_live_view():
+    send('connected')
+
+
+@socketio.on('disconnect')
+def disconnect_live_view():
+    send('disconnected')
