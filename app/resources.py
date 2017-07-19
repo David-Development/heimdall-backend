@@ -130,8 +130,13 @@ api.add_resource(ImageListRes, '/api/images/')
 
 
 @app.route("/")
-def hello_world():
-    return render_template('index.html')
+def index():
+    return render_template('index.html', title="Heimdall Face Recognition")
+
+
+@app.route("/liveview")
+def liveview():
+    return render_template('liveview.html', title="Liveview")
 
 
 @app.route("/api/resync")
@@ -210,20 +215,23 @@ def classify_db_image(image_id):
 
     predictions = []
     # Jedes erkannte Gesicht
-    for faces in results:
+    for faces, bb in zip(results, bbs):
         # Das wahrscheinlichste Ergebnis
         highest = np.argmax(faces)
+        prob = np.max(faces)
         prediction_dict = {}
-        prediction_result_dict = {'highest': app.labels[highest]}
+        prediction_result_dict = {'highest': app.labels[highest],
+                                  'bounding_box': bb,
+                                  'probability': round(prob, 4)}
         # Alle Wahrscheinlichkeiten
         for idx, prediction in enumerate(faces):
-            prediction_dict[app.labels[idx]] = prediction
+            prediction_dict[app.labels[idx]] = round(prediction, 4)
         prediction_result_dict['probabilities'] = prediction_dict
 
         predictions.append(prediction_result_dict)
 
-    return jsonify({'message:': 'classification complete',
-                    'predictions:': predictions,
+    return jsonify({'message': 'classification complete',
+                    'predictions': predictions,
                     'bounding_boxes': bbs})
 
 

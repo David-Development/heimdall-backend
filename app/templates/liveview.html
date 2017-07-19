@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block head %}
+    {{ super() }}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.7.4/socket.io.min.js"></script>
+    <script src="static/js/application.js"></script>
+{% endblock %}
+{% block page %}{{ title }}{% endblock %}
+{% block content %}
+
+    <div class="container" id="content">
+        <div id=classifications>
+
+        </div>
+    </div>
+
+{% endblock %}

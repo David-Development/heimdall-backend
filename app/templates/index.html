@@ -1,22 +1,13 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.7.4/socket.io.min.js"></script>
-    <script src="static/js/application.js"></script>
+{% extends "layout.html" %}
+{% block title %}{{title}}{% endblock %}
+{% block head %}
+  {{ super() }}
+{% endblock %}
+{% block page %}{{title}}{% endblock %}
+{% block heading %}
+  {{ super() }}
+{% endblock %}
+{% block content %}
+  <h3> This is the start of my child template</h3>
 
-    <link rel="stylesheet" type="text/css" href="static/css/application.css">
-</head>
-<body>
-
-
-<div class="container" id="content">
-    <div class="row">
-        <img id="img" class="resize" src="">
-        <div id="result"></div>
-    </div>
-</div>
-
-
-</body>
-</html>
+{% endblock %}

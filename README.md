@@ -46,7 +46,10 @@ postgres available under `0.0.0.0:5432`
 redis available under `0.0.0.0:6379`
 
 **Run Celery Worker**  
-`celery worker -A app.celery --loglevel=info`
+`celery worker -A celery_worker.celery --loglevel=info`
+
+**Run Application**  
+`python manage.py run`
 
 
 **TODO**
