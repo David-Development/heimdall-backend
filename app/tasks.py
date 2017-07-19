@@ -389,27 +389,28 @@ def run_camera_socket():
             url = url_for('classify_db_image', image_id=id, _external=True)
         r = requests.get(url)
         result = r.json()
-        image = annotate_image(image, result)
+        if len(result['predictions']) > 0:
+            image = annotate_image(image, result)
 
         socketio.emit('new_image', json.dumps({'image': image,
+                                               'image_id': id,
                                                'classification': result}))
 
 
 def annotate_image(image, classification_result):
+    image = base64.b64decode(image)
+    image = np.fromstring(image, dtype=np.uint8)
+    image = cv2.imdecode(image, cv2.IMREAD_COLOR)
     for prediction in classification_result['predictions']:
         bb = prediction['bounding_box']
         name = prediction['highest']
         prob = prediction['probability']
-
-        image = base64.b64decode(image)
-        image = np.fromstring(image, dtype=np.uint8)
-        image = cv2.imdecode(image, cv2.IMREAD_COLOR)
         if name == 'unknown':
             color = (255, 0, 0)
         else:
             color = (0, 255, 0)
         image = cv2.rectangle(image, pt1=(bb[0], bb[1]), pt2=(bb[0] + bb[2], bb[1] + bb[3]), color=color, thickness=1)
-        image = cv2.putText(image, name + ': ' + str(round(prob, 2)), (bb[0], bb[1] + bb[3] + 25),
+        image = cv2.putText(image, name + ': ' + str(round(prob, 2)), (bb[0], bb[1] + bb[3] + 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, color, thickness=2)
 
-        return base64.b64encode(cv2.imencode('.jpg', image)[1])
+    return base64.b64encode(cv2.imencode('.jpg', image)[1])

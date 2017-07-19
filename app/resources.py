@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from flask import jsonify, send_from_directory, request, url_for, render_template
 import numpy as np
 from flask_socketio import send, emit
+from celery.signals import celeryd_init
 
 from models import Gallery, Image, ClassifierStats
 from app import api, app, db, recognizer, clf, labels, socketio
@@ -276,3 +277,8 @@ def connect_live_view():
 @socketio.on('disconnect')
 def disconnect_live_view():
     send('disconnected')
+
+
+@celeryd_init.connect
+def on_celery_init(sender=None, conf=None, **kwargs):
+    run_camera_socket.apply_async()

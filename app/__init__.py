@@ -1,5 +1,6 @@
 import eventlet
 import os
+import glob
 import logging
 
 from flask import Flask
@@ -11,7 +12,6 @@ from flask_sqlalchemy import SQLAlchemy
 from celery import Celery
 
 from recognition import Recognizer
-
 logging.getLogger('socketio').setLevel(logging.ERROR)
 logging.getLogger('engineio').setLevel(logging.ERROR)
 
@@ -40,8 +40,13 @@ from app import models, resources
 
 
 def create_app(main=True):
-    from tasks import create_classifier
+    from tasks import create_classifier, load_classifier
     app.clf = create_classifier()
+    path = app.config['ML_MODEL_PATH'] + os.sep + '*.pkl'
+    latest_model = max(glob.glob(path), key=os.path.getctime)
+    app.clf = load_classifier(latest_model)
+    db_model = models.ClassifierStats.query.order_by(models.ClassifierStats.date.desc()).first()
+    app.labels = db_model.labels_as_dict()
     # Initialize extensions
     extensions(app, main)
 
