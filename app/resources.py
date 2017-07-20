@@ -1,5 +1,6 @@
 import os
 import glob
+import datetime
 
 from flask_restful import Resource, reqparse, marshal_with, fields, abort
 from sqlalchemy.exc import IntegrityError
@@ -8,7 +9,7 @@ import numpy as np
 from flask_socketio import send, emit
 from celery.signals import celeryd_init
 
-from models import Gallery, Image, ClassifierStats
+from models import Gallery, Image, ClassifierStats, ClassificationResults, Result
 from app import api, app, db, recognizer, clf, labels, socketio
 from recognition import utils
 from tasks import (sync_db_from_filesystem, delete_gallery, move_images, download_models, models_exist,
@@ -140,6 +141,26 @@ def liveview():
     return render_template('liveview.html', title="Liveview")
 
 
+@app.route("/galleries")
+def galleries():
+    gls = Gallery.query.all()
+    return render_template('galleries.html', title="Person Galleries", galleries=gls)
+
+
+@app.route("/classifications")
+def recent_classifications():
+    classifications = ClassificationResults.query.order_by(ClassificationResults.date.desc()).limit(30).all()
+    res = {}
+    for classification in classifications:
+        print classification.image.path
+        for result in classification.results:
+            print result.gallery
+
+
+    return render_template('recent_classifications.html', title="Recent Classifications",
+                           classifications=classifications)
+
+
 @app.route("/api/resync")
 def resync_db():
     sync_db_from_filesystem()
@@ -208,11 +229,16 @@ def training_recognizer():
 
 @app.route("/api/recognizer/classify/<image_id>")
 def classify_db_image(image_id):
-    image = Image.query.filter_by(id=image_id).first()
-    image_path = os.path.join(config['BASEDIR'], image.path)
+    db_image = Image.query.filter_by(id=image_id).first()
+    image_path = os.path.join(config['BASEDIR'], db_image.path)
     image = utils.load_image(image_path)
 
     results, bbs = classify(app.clf, image)
+    latest_clf = ClassifierStats.query.order_by(ClassifierStats.date.desc()).first()
+    classification_result = ClassificationResults(clf_id=latest_clf.id, image_id=db_image.id,
+                                                  date=datetime.datetime.now())
+    db.session.add(classification_result)
+    db.session.flush()
 
     predictions = []
     # Jedes erkannte Gesicht
@@ -220,8 +246,16 @@ def classify_db_image(image_id):
         # Das wahrscheinlichste Ergebnis
         highest = np.argmax(faces)
         prob = np.max(faces)
+
+        # Weniger als Grenzwert wird als unbekannt eingestuft
+        if prob < config['PROBABILITY_THRESHOLD']:
+            label = 'unknown'
+        else:
+            label = app.labels[highest]
+        gallery = Gallery.query.filter_by(name=label).first()
+        db.session.add(Result(classification=classification_result.id, gallery_id=gallery.id, probability=prob))
         prediction_dict = {}
-        prediction_result_dict = {'highest': app.labels[highest],
+        prediction_result_dict = {'highest': label,
                                   'bounding_box': bb,
                                   'probability': round(prob, 4)}
         # Alle Wahrscheinlichkeiten
@@ -230,6 +264,8 @@ def classify_db_image(image_id):
         prediction_result_dict['probabilities'] = prediction_dict
 
         predictions.append(prediction_result_dict)
+
+        db.session.commit()
 
     return jsonify({'message': 'classification complete',
                     'predictions': predictions,

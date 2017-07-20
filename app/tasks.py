@@ -201,6 +201,8 @@ def models_exist():
 def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
     classifier = create_classifier(clf_type, n_jobs, k)
     X, y, folder_names = utils.load_dataset(config['SUBJECTS_BASE_PATH'], grayscale=False)
+    avg_images = np.mean(np.unique(y, return_counts=True)[1])
+
     X, y = augment_images(X, y, target=config['NUM_TARGET_IMAGES'], celery_binding=self)
     label_dict = utils.create_label_dict(y, folder_names)
     total_images = len(y)
@@ -209,6 +211,7 @@ def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
     cv_score = None
     transformed = []
     labels = []
+    start = time.time()
     for data in zip(X, y):
         image = data[0]
         label = data[1]
@@ -224,24 +227,26 @@ def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
         else:
             no_face += 1
 
-    print no_face
-
-    self.update_state(state='STARTED',
-                      meta={'current': total_images, 'total': total_images,
-                            'step': 'Scoring'})
-    cv_score = np.mean(cross_val_score(classifier, transformed, labels, cv=5, n_jobs=n_jobs))
+    if cross_val:
+        self.update_state(state='STARTED',
+                          meta={'current': total_images, 'total': total_images,
+                                'step': 'Scoring'})
+        cv_score = np.mean(cross_val_score(classifier, transformed, labels, cv=5, n_jobs=n_jobs))
 
     self.update_state(state='STARTED',
                       meta={'current': total_images, 'total': total_images,
                             'step': 'Training'})
     classifier.fit(transformed, labels)
 
+    training_time = time.time() - start
+
     timestamp = time.strftime('%Y%m%d%H%M%S')
     filename = clf_type + timestamp + '.pkl'
     path = os.path.join(config['ML_MODEL_PATH'], filename)
 
     stats = ClassifierStats(name=clf_type + timestamp, classifier_type=clf_type, model_path=path,
-                            date=datetime.datetime.now(), cv_score=cv_score)
+                            date=datetime.datetime.now(), cv_score=cv_score, total_images=total_images,
+                            total_no_face=no_face, training_time=training_time, avg_base_img=avg_images)
     db.session.add(stats)
     # flush to generate stats id
     db.session.flush()
@@ -406,7 +411,7 @@ def annotate_image(image, classification_result):
         name = prediction['highest']
         prob = prediction['probability']
         if name == 'unknown':
-            color = (255, 0, 0)
+            color = (0, 0, 255)
         else:
             color = (0, 255, 0)
         image = cv2.rectangle(image, pt1=(bb[0], bb[1]), pt2=(bb[0] + bb[2], bb[1] + bb[3]), color=color, thickness=1)

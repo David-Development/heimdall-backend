@@ -6,3 +6,14 @@
     background: #5d6368;
     border-radius: 25px
 }
+
+img.recent {
+    display: block;
+    max-width: 400px;
+    width: auto;
+    height: auto;
+}
+
+li.recent {
+    font-size: large;
+}

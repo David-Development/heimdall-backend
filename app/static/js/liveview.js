@@ -34,10 +34,6 @@ $(document).ready(function () {
                 });
                 len = keys.length;
 
-                for (i = 0; i < len; i++) {
-                    k = keys[i];
-                    console.log(k + ':' + probabilities[k]);
-                }
                 probabilities_text += 'Classification Result: ' + res['highest'] + '</br>';
                 probabilities_text += 'Probability/Confidence: ' + res['probability'] + '</br>';
                 probabilities_text += 'Other Probabilities' + '</br>';
@@ -58,5 +54,8 @@ $(document).ready(function () {
             }
         }
         classification_div.prepend(html_result);
+        if (classification_div.children().length > 30) {
+            classification_div.children().last().remove();
+        }
     });
 });

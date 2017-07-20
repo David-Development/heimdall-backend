@@ -60,28 +60,41 @@ redis available under `0.0.0.0:6379`
     - Return useful information after classification [DONE]
     - Class-individual augmentation to target number of images [DONE]
     - Cross-validation for score of current model (background task) [DONE]
-    - Save more info of model after training
-        - Number of images 
-        - Average number of base images per class
-        - Number of images without a found face
-    - Hook up background tasks to socket.io channels
+    - Save more info of model after training [DONE]
+        - Number of images [DONE]
+        - Average number of base images per class [DONE]
+        - Number of images without a found face [DONE]
+    - Investigate Memory Leaks
+        - https://github.com/celery/celery/issues/3813
+        - Celery tasks don't get closed after finishing
+            - Maybe `del X,y` etc?
+        - prevent multiple trainings tasks 
+            - https://github.com/celery/celery/issues/3436
+            - http://loose-bits.com/2010/10/distributed-task-locking-in-celery.html
+    - Hook up background tasks to socket.io channels [DONE for live view]
     - Refactor App
         - Pull code out of \__init\__.py
     - Save last classifications (image and classification result (gallery))
-    - Include socket endpoint for camera input
-    - Create socket.io endpoint for classification output
-        - Draw bounding box in image, with classification result
+    - Include socket endpoint for camera input [DONE]
+    - Create socket.io endpoint for classification output [DONE]
+        - Draw bounding box in image, with classification result [DONE]
+        - Make annotation dependent on parameter
+    - Load Classifier + Labels on startup [DONE]
+        - Include check if classifier exists before loading attempt... 
+    - Security check for camera listener, don't allow images from everywhere...
+    - Start camera listener socket on celery start [DONE]
+        - In API-Endpoint, check if task is running before attempting to start
     - List of running tasks, their ids/urls and types (API-Endpoint)
     - Replace TF/Keras Dependency with custom or independent library for image augmentation
     - Run FaceDetection on each subject and unknown image and save bounding box in database
 - Frontend
-    - Index Page
-    - Navigation Bar
+    - Index Page [STARTED]
+    - Navigation Bar [STARTED]
     - Gallery overview
         - Create new Gallery
         - Show Gallery
         - Move images 
-    - live classification view (hook up to socket.io endpoint for classification output)
+    - live classification view (hook up to socket.io endpoint for classification output) [DONE]
     - show last classifications
         - mark classification as wrong
             - is unknown -> to unknown
@@ -90,6 +103,10 @@ redis available under `0.0.0.0:6379`
     - show running tasks
     - show stats of current model
         - retrain model
+    - Local hosting of js and css libraries
+        - bootstrap
+        - jquery
+        - socket io
             
             
     

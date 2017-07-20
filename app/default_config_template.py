@@ -17,6 +17,7 @@ SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 CELERY_BROKER_URL = 'redis://<host>:<port>/0'
 CELERY_RESULT_BACKEND = 'redis://<host>:<port>/0'
+worker_max_memory_per_child = 2000000
 
 IMAGE_FOLDER = 'images'
 NEW_IMAGES_FOLDER = os.path.join(IMAGE_FOLDER, 'new')
@@ -30,6 +31,7 @@ SUBJECTS_BASE_PATH = os.path.join(IMAGE_BASE_PATH, 'subjects')
 UNKNOWN_IMAGES_PATH = os.path.join(SUBJECTS_BASE_PATH, 'unknown')
 
 NUM_TARGET_IMAGES = 50
+PROBABILITY_THRESHOLD = 0.4
 
 DLIB_SHAPE_PREDICTOR_MODEL = 'shape_predictor_68_face_landmarks.dat'
 DLIB_FACE_RECOGNITION_MODEL = 'dlib_face_recognition_resnet_model_v1.dat'
