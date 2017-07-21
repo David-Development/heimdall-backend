@@ -7,10 +7,10 @@ from sqlalchemy.exc import IntegrityError
 from flask import jsonify, send_from_directory, request, url_for, render_template
 import numpy as np
 from flask_socketio import send, emit
-from celery.signals import celeryd_init
+from celery.signals import celeryd_init, task_prerun, task_postrun
 
 from models import Gallery, Image, ClassifierStats, ClassificationResults, Result
-from app import api, app, db, recognizer, clf, labels, socketio
+from app import api, app, db, recognizer, clf, labels, socketio, celery, r
 from recognition import utils
 from tasks import (sync_db_from_filesystem, delete_gallery, move_images, download_models, models_exist,
                    train_recognizer, load_classifier, classify, run_camera_socket)
@@ -113,6 +113,8 @@ class ImageListRes(Resource):
         # move in db
         for image in images:
             image.gallery_id = gallery_id
+            image.path = os.path.join(gallery.path, image.name)
+
         db.session.commit()
 
         return {'message': 'images moved'}, 200
@@ -121,7 +123,7 @@ class ImageListRes(Resource):
 class GalleryImagesListRes(Resource):
     @marshal_with(image_fields)
     def get(self, gallery_id):
-        images = Image.query.filter_by(gallery_id=gallery_id).all()
+        images = Image.query.order_by(Image.id.desc()).filter_by(gallery_id=gallery_id).all()
         return images
 
 
@@ -156,9 +158,21 @@ def recent_classifications():
         for result in classification.results:
             print result.gallery
 
-
     return render_template('recent_classifications.html', title="Recent Classifications",
                            classifications=classifications)
+
+
+@app.route("/tasks")
+def task_overview():
+    tasks = {}
+    for key in r.keys():
+        content = r.hgetall(key)
+        if key == 'app.tasks.train_recognizer':
+            print content.keys()
+            content['task_url'] = url_for('recognizer_training_status', task_id=content['task_id'])
+        tasks[key] = content
+
+    return jsonify(tasks), 201
 
 
 @app.route("/api/resync")
@@ -239,6 +253,8 @@ def classify_db_image(image_id):
                                                   date=datetime.datetime.now())
     db.session.add(classification_result)
     db.session.flush()
+    print '#############################################################'
+    print classification_result
 
     predictions = []
     # Jedes erkannte Gesicht
@@ -318,3 +334,9 @@ def disconnect_live_view():
 @celeryd_init.connect
 def on_celery_init(sender=None, conf=None, **kwargs):
     run_camera_socket.apply_async()
+
+
+@task_prerun.connect
+def on_task_prerun(task_id, task, *args, **kwargs):
+    content = {'task_id': task_id, 'status': 'Started'}
+    r.hmset(task.name, content)

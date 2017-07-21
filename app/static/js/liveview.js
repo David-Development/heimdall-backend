@@ -13,9 +13,9 @@ $(document).ready(function () {
         var image_id = result_obj['image_id'];
         image_id_text = '<p>Image ID: ' + result_obj['image_id'] + '</p>';
         var img_text = '<div class="col-md-8"><img id=' + image_id + ' src=' + img_src + ' class="img-rounded"></div>';
-        var html_result = '<div class="row margin_top liveresult">' + img_text;
+        var html_result = '<div class="row margin_top well">' + img_text;
         if (result_obj['classification']['predictions'].length === 0) {
-            html_result += '<div class="col-md-4"><div id="result">' + image_id_text + ' ' +
+            html_result += '<div class="col-md-2"><div id="result">' + image_id_text + ' ' +
                 '<p>No Faces found</p></div></div>';
         }
         else {
@@ -37,21 +37,22 @@ $(document).ready(function () {
                 probabilities_text += 'Classification Result: ' + res['highest'] + '</br>';
                 probabilities_text += 'Probability/Confidence: ' + res['probability'] + '</br>';
                 probabilities_text += 'Other Probabilities' + '</br>';
-                for (i = 1; i < len; i++) {
-                    if (i >= 6) {
+                for (var j = 1; j < len; j++) {
+                    if (j >= 6) {
                         break;
                     }
-                    name = keys[i];
+                    name = keys[j];
                     probabilities_text += name + ': ' + res['probabilities'][name] + '</br>';
 
 
                 }
                 probabilities_text += '</p>';
 
-                html_result += '<div class="col-md-4"><div id="result">' + image_id_text + probabilities_text
-                    + '</div></div></div>';
+                html_result += '<div class="col-md-2 row"><div id="result' + i + '">' + image_id_text + probabilities_text
+                    + '</div></div>';
 
             }
+            html_result += '</div>'
         }
         classification_div.prepend(html_result);
         if (classification_div.children().length > 30) {

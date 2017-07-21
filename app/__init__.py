@@ -10,6 +10,7 @@ from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from celery import Celery
+import redis
 
 from recognition import Recognizer
 
@@ -24,6 +25,7 @@ app = Flask(__name__)
 api = Api(app)
 AppConfig(app, os.path.join(basedir, 'default_config.py'))
 db = SQLAlchemy(app)
+r = redis.StrictRedis(host='localhost', port='6379', db=1)
 
 # turn the flask app into a socketio app
 

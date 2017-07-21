@@ -197,7 +197,7 @@ def models_exist():
     return dlib_shape_predictor and dlib_face_descriptor
 
 
-@celery.task(bind=True)
+@celery.task(bind=True, time_limit=200)
 def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
     classifier = create_classifier(clf_type, n_jobs, k)
     X, y, folder_names = utils.load_dataset(config['SUBJECTS_BASE_PATH'], grayscale=False)
@@ -385,6 +385,7 @@ def run_camera_socket():
             if not data:
                 break
             image += data
+        conn.close()
 
         image = base64.b64encode(image.decode("hex"))
 
@@ -411,11 +412,13 @@ def annotate_image(image, classification_result):
         name = prediction['highest']
         prob = prediction['probability']
         if name == 'unknown':
+            text = name
             color = (0, 0, 255)
         else:
+            text = name + ': ' + str(round(prob, 2))
             color = (0, 255, 0)
         image = cv2.rectangle(image, pt1=(bb[0], bb[1]), pt2=(bb[0] + bb[2], bb[1] + bb[3]), color=color, thickness=1)
-        image = cv2.putText(image, name + ': ' + str(round(prob, 2)), (bb[0], bb[1] + bb[3] + 30),
+        image = cv2.putText(image, text, (bb[0], bb[1] + bb[3] + 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, color, thickness=2)
 
     return base64.b64encode(cv2.imencode('.jpg', image)[1])

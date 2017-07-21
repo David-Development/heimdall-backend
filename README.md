@@ -81,9 +81,11 @@ redis available under `0.0.0.0:6379`
         - Make annotation dependent on parameter
     - Load Classifier + Labels on startup [DONE]
         - Include check if classifier exists before loading attempt... 
+    - Check if gallery exists in database before loading label for classification (resync if not)
     - Security check for camera listener, don't allow images from everywhere...
     - Start camera listener socket on celery start [DONE]
         - In API-Endpoint, check if task is running before attempting to start
+        - Replace camera socket with external script and api endpoint for new images, should prevent celery task problems
     - List of running tasks, their ids/urls and types (API-Endpoint)
     - Replace TF/Keras Dependency with custom or independent library for image augmentation
     - Run FaceDetection on each subject and unknown image and save bounding box in database

@@ -3,10 +3,10 @@
 <html>
 <head>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
-    <script src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/application.css') }}">
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/bootstrap.dark.min.css') }}">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
     {% block head %}
         <title>{% block title %}{% endblock %} - Heimdall Face Recognition</title>
     {% endblock %}
@@ -32,6 +32,7 @@
                 {{ nav_link('galleries', 'Galleries') }}
                 {{ nav_link('liveview', 'Liveview') }}
                 {{ nav_link('recent_classifications', 'Recent Classifications') }}
+                {{ nav_link('task_overview', 'Tasks') }}
                 {# {{ nav_link('contact', 'Contact Us') }}#}
             </ul>
             <form class="navbar-form navbar-left" role="search">
