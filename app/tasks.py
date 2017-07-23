@@ -5,7 +5,6 @@ import bz2
 import time
 import datetime
 import multiprocessing
-import socket
 import base64
 
 import requests
@@ -246,7 +245,8 @@ def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
 
     stats = ClassifierStats(name=clf_type + timestamp, classifier_type=clf_type, model_path=path,
                             date=datetime.datetime.now(), cv_score=cv_score, total_images=total_images,
-                            total_no_face=no_face, training_time=training_time, avg_base_img=avg_images)
+                            total_no_face=no_face, training_time=training_time, avg_base_img=avg_images,
+                            num_classes=len(folder_names))
     db.session.add(stats)
     # flush to generate stats id
     db.session.flush()
@@ -360,47 +360,6 @@ def classify(classifier, image, dists=False, neighbors=None):
             results.append(classifier.predict_proba(descriptor)[0])
 
     return results, bbs
-
-
-@celery.task
-def run_camera_socket():
-    host = app.config['CAMERA_SOCKET_HOST']
-    port = app.config['CAMERA_SOCKET_PORT']
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
-    try:
-        s.bind((host, port))
-    except socket.error as msg:
-        print 'Socket binding failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
-
-    s.listen(5)
-    print 'Socket binding complete, waiting for image'
-    while True:
-        conn, addr = s.accept()
-        print 'Connected with ' + addr[0] + ':' + str(addr[1])
-        image = ''
-        while True:
-            data = conn.recv(4096)
-            if not data:
-                break
-            image += data
-        conn.close()
-
-        image = base64.b64encode(image.decode("hex"))
-
-        filename = str(time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())) + '.jpg'
-        id = new_image(image, filename)
-        with app.app_context():
-            url = url_for('classify_db_image', image_id=id, _external=True)
-        r = requests.get(url)
-        result = r.json()
-        if len(result['predictions']) > 0:
-            image = annotate_image(image, result)
-
-        socketio.emit('new_image', json.dumps({'image': image,
-                                               'image_id': id,
-                                               'classification': result}))
 
 
 def annotate_image(image, classification_result):

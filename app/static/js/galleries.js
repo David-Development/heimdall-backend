@@ -9,7 +9,6 @@
         load_images(url);
     };
 
-
     var imageclick = function () {
         var img = $(this);
         if (img.hasClass('selected')) {
@@ -40,6 +39,25 @@
         }).success(function () {
             selected_images = [];
         });
+    });
+
+    $('#create_button').on('click', function () {
+        var data = {};
+        data.name = $('#new_gallery_name').val();
+
+        $.ajax({
+            type: 'POST',
+            url: '/api/gallery/',
+            data: JSON.stringify(data),
+            contentType: 'application/json'
+        }).done(function (data) {
+            console.log(data);
+            var option = $('<option />');
+            option.val(data.id);
+            option.text(data.name);
+            $('#gallery_select').append(option);
+            $('#action_select').append(option);
+        })
     });
 
     var load_images = function (url) {

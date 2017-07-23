@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import datetime
 from app import db
 from sqlalchemy.ext.hybrid import hybrid_property, hybrid_method
 
@@ -12,11 +13,13 @@ class Gallery(db.Model):
     path = db.Column(db.String())
     subject_gallery = db.Column(db.Boolean, default=True)
     images = db.relationship('Image', backref='gallery', lazy='dynamic')
+    createdate = db.Column(db.DateTime)
 
     def __init__(self, name, path, subject_gallery=True):
         self.name = name
         self.path = path
         self.subject_gallery = subject_gallery
+        self.createdate = datetime.datetime.now()
 
     @hybrid_property
     def images_count(self):
@@ -33,6 +36,7 @@ class Image(db.Model):
     name = db.Column(db.String(255))
     gallery_id = db.Column(db.Integer, db.ForeignKey('gallery.id'))
     path = db.Column(db.String())
+    createdate = db.Column(db.DateTime)
 
     @property
     def url(self):
@@ -43,6 +47,7 @@ class Image(db.Model):
         self.name = name
         self.path = path
         self.gallery_id = gallery_id
+        self.createdate = datetime.datetime.now()
 
 
 class ClassifierStats(db.Model):
@@ -60,6 +65,8 @@ class ClassifierStats(db.Model):
     cv_score = db.Column(db.Float)
     # corresponding labels for classification results
     labels = db.relationship('Labels', backref='classifierstats', lazy='dynamic')
+    # number of classes/persons
+    num_classes = db.Column(db.Integer)
     # total number of images used for training
     total_images = db.Column(db.Integer)
     # average number of images per class
@@ -68,13 +75,17 @@ class ClassifierStats(db.Model):
     total_no_face = db.Column(db.Integer)
     # total training time, consisting of time for augmentation, feature extraction and classifier training, in seconds
     training_time = db.Column(db.Integer)
+    # is model currently loaded/used
+    loaded = db.Column(db.Boolean)
 
-    def __init__(self, name, classifier_type, model_path, date, cv_score=None, total_images=None, avg_base_img=None,
+    def __init__(self, name, classifier_type, model_path, date, num_classes, cv_score=None, total_images=None,
+                 avg_base_img=None,
                  total_no_face=None, training_time=None):
         self.name = name
         self.classifier_type = classifier_type
         self.model_path = model_path
         self.date = date
+        self.num_classes = num_classes
         self.cv_score = cv_score
         self.total_images = total_images
         self.avg_base_img = avg_base_img

@@ -71,33 +71,31 @@ redis available under `0.0.0.0:6379`
         - prevent multiple trainings tasks 
             - https://github.com/celery/celery/issues/3436
             - http://loose-bits.com/2010/10/distributed-task-locking-in-celery.html
-    - Hook up background tasks to socket.io channels [DONE for live view]
     - Refactor App
         - Pull code out of \__init\__.py
-    - Save last classifications (image and classification result (gallery))
-    - Include socket endpoint for camera input [DONE]
+    - Save last classifications (image and classification result (gallery)) [DONE]
     - Create socket.io endpoint for classification output [DONE]
         - Draw bounding box in image, with classification result [DONE]
-        - Make annotation dependent on parameter
+        - Make annotation dependent on parameter [DONE]
     - Load Classifier + Labels on startup [DONE]
         - Include check if classifier exists before loading attempt... 
     - Check if gallery exists in database before loading label for classification (resync if not)
     - Security check for camera listener, don't allow images from everywhere...
-    - Start camera listener socket on celery start [DONE]
+    - Start camera listener socket on celery start [DONE][REMOVED!!] 
         - In API-Endpoint, check if task is running before attempting to start
-        - Replace camera socket with external script and api endpoint for new images, should prevent celery task problems
+        - Replace camera socket with external script and api endpoint for new images, should prevent celery task problems [DONE]
     - List of running tasks, their ids/urls and types (API-Endpoint)
     - Replace TF/Keras Dependency with custom or independent library for image augmentation
     - Run FaceDetection on each subject and unknown image and save bounding box in database
 - Frontend
     - Index Page [STARTED]
     - Navigation Bar [STARTED]
-    - Gallery overview
+    - Gallery overview [DONE]
         - Create new Gallery
-        - Show Gallery
-        - Move images 
+        - Show Gallery [DONE]
+        - Move images  [DONE]
     - live classification view (hook up to socket.io endpoint for classification output) [DONE]
-    - show last classifications
+    - show last classifications [DONE]
         - mark classification as wrong
             - is unknown -> to unknown
             - is subject -> to subject gallery

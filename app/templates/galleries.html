@@ -5,15 +5,20 @@
 {% endblock %}
 {% block page %}{{ title }}{% endblock %}
 {% block content %}
-    <div class="col-md-2 container">
+    <div class="col-md-3 container">
         <select id="gallery_select" class="form-control" size="{{ galleries|length }}">
             {% for gallery in galleries %}
                 <option value="{{ gallery.id }}">{{ gallery.name }}</option>
             {% endfor %}
         </select>
-        <
+        <div class="input-group input-group-sm">
+            <input type="text" class="form-control" placeholder="New Gallery" id="new_gallery_name">
+            <span class="input-group-btn">
+        <button class="btn btn-secondary" type="button" id="create_button">Create</button>
+      </span>
+        </div>
     </div>
-    <div class="col-md-10 container" id="images">
+    <div class="col-md-9 container" id="images">
         <div id="control_div" class="hidden form-inline">
             <select id="action_select" class="form-control">
                 <option/>

@@ -1,19 +1,21 @@
 import os
 import glob
 import datetime
+import time
 
 from flask_restful import Resource, reqparse, marshal_with, fields, abort
 from sqlalchemy.exc import IntegrityError
-from flask import jsonify, send_from_directory, request, url_for, render_template
+from flask import jsonify, send_from_directory, request, url_for, render_template, json
 import numpy as np
 from flask_socketio import send, emit
-from celery.signals import celeryd_init, task_prerun, task_postrun
+from celery.signals import task_prerun, task_postrun
+import requests
 
 from models import Gallery, Image, ClassifierStats, ClassificationResults, Result
 from app import api, app, db, recognizer, clf, labels, socketio, celery, r
 from recognition import utils
 from tasks import (sync_db_from_filesystem, delete_gallery, move_images, download_models, models_exist,
-                   train_recognizer, load_classifier, classify, run_camera_socket)
+                   train_recognizer, load_classifier, classify, new_image, annotate_image)
 
 config = app.config
 
@@ -23,6 +25,10 @@ gallery_parser.add_argument('name')
 image_parser = reqparse.RequestParser()
 image_parser.add_argument('image_ids', action="append")
 image_parser.add_argument('gallery_id')
+
+live_parser = reqparse.RequestParser()
+live_parser.add_argument('image')
+live_parser.add_argument('annotate')
 
 gallery_fields = {
     'id': fields.Integer,
@@ -39,6 +45,24 @@ image_fields = {
     'url': fields.String,
     'gallery_id': fields.Integer(attribute='gallery.id'),
     'gallery_name': fields.String(attribute='gallery.name'),
+}
+
+model_fields = {
+    'id': fields.Integer,
+    'name': fields.String,
+    'classifier_type': fields.String,
+    'date': fields.DateTime,
+    'cv_score': fields.Float,
+    'avg_base_img': fields.Float,
+    'total_images': fields.Integer,
+    'total_no_faces': fields.Integer,
+    'loaded': fields.Boolean,
+    'num_classes': fields.Integer,
+    'training_time': fields.Integer
+}
+
+model_list_fields = {
+    'data': fields.List(fields.Nested(model_fields))
 }
 
 
@@ -127,10 +151,18 @@ class GalleryImagesListRes(Resource):
         return images
 
 
+class ModelListRes(Resource):
+    @marshal_with(model_list_fields)
+    def get(self):
+        res = ClassifierStats.query.order_by(ClassifierStats.loaded.desc(), ClassifierStats.date.desc()).all()
+        return {'data': res}, 200
+
+
 api.add_resource(GalleryRes, '/api/gallery/', '/api/gallery/<gallery_id>/')
 api.add_resource(GalleryImagesListRes, '/api/gallery/<gallery_id>/images/')
 api.add_resource(GalleryListRes, '/api/galleries/')
 api.add_resource(ImageListRes, '/api/images/')
+api.add_resource(ModelListRes, '/api/models/')
 
 
 @app.route("/")
@@ -152,7 +184,6 @@ def galleries():
 @app.route("/classifications")
 def recent_classifications():
     classifications = ClassificationResults.query.order_by(ClassificationResults.date.desc()).limit(30).all()
-    res = {}
     for classification in classifications:
         print classification.image.path
         for result in classification.results:
@@ -175,6 +206,12 @@ def task_overview():
     return jsonify(tasks), 201
 
 
+@app.route("/models")
+def models():
+    return render_template('models.html', models=ClassifierStats.query.order_by(ClassifierStats.loaded.desc(),
+                                                                                ClassifierStats.date.desc()).all())
+
+
 @app.route("/api/resync")
 def resync_db():
     sync_db_from_filesystem()
@@ -186,7 +223,7 @@ def show_images(filename):
     return send_from_directory(config['IMAGE_BASE_PATH'], filename)
 
 
-@app.route("/api/models/", methods=['GET', 'POST'])
+@app.route("/api/dlib_models/", methods=['GET', 'POST'])
 def check_models():
     # Check if Models exist
     if request.method == 'GET':
@@ -202,7 +239,7 @@ def check_models():
         return jsonify({'message': 'download started', 'location': task_url}), 202, {'Location': task_url}
 
 
-@app.route("/api/models/status/<task_id>")
+@app.route("/api/dlib_models/status/<task_id>")
 def model_download_status(task_id):
     task = download_models.AsyncResult(task_id)
     response = {
@@ -241,6 +278,37 @@ def training_recognizer():
     return jsonify({'message': 'Training started', 'location': task_url}), 202, {'Location': task_url}
 
 
+@app.route("/api/live/", methods=['POST'])
+def new_live_image():
+    """
+    Receives a image as base64 encoded string, saves it in the database and classifies it with the classify_db_image 
+    method. After classification the result is emitted to clients via a socket io connection.
+    :return: 
+    """
+
+    parsed_args = live_parser.parse_args()
+    image = parsed_args['image']
+    annotate = True
+    if parsed_args['annotate'] is not None:
+        if parsed_args['annotate'] == u'False':
+            annotate = False
+
+    filename = str(time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())) + '.jpg'
+    id = new_image(image, filename)
+    with app.app_context():
+        url = url_for('classify_db_image', image_id=id, _external=True)
+    r = requests.get(url)
+    result = r.json()
+    if len(result['predictions']) > 0 and annotate:
+        image = annotate_image(image, result)
+
+    socketio.emit('new_image', json.dumps({'image': image,
+                                           'image_id': id,
+                                           'classification': result}))
+
+    return jsonify({'message': 'Image processed'}), 200
+
+
 @app.route("/api/recognizer/classify/<image_id>")
 def classify_db_image(image_id):
     db_image = Image.query.filter_by(id=image_id).first()
@@ -253,8 +321,6 @@ def classify_db_image(image_id):
                                                   date=datetime.datetime.now())
     db.session.add(classification_result)
     db.session.flush()
-    print '#############################################################'
-    print classification_result
 
     predictions = []
     # Jedes erkannte Gesicht
@@ -311,14 +377,25 @@ def load_new_classifier():
     app.clf = load_classifier(latest_model)
     db_model = ClassifierStats.query.order_by(ClassifierStats.date.desc()).first()
     app.labels = db_model.labels_as_dict()
+    old_model = ClassifierStats.query.filter_by(loaded=True).first()
+    old_model.loaded = False
+    db_model.loaded = True
+    db.session.commit()
 
     return jsonify({'message': 'new model loaded into classifier'}), 201
 
 
-@app.route("/api/cameralistener/", methods=['POST'])
-def start_camera_listener():
-    run_camera_socket.apply_async()
-    return jsonify({'message': 'socket started'}), 202
+@app.route("/api/classifier/load/<model_id>", methods=['POST'])
+def load_db_classifier(model_id):
+    model = ClassifierStats.query.filter_by(id=model_id).first()
+    old_model = ClassifierStats.query.filter_by(loaded=True).first()
+    old_model.loaded = False
+    model.loaded = True
+    app.clf = load_classifier(model.model_path)
+    app.labels = model.labels_as_dict()
+    db.session.commit()
+
+    return jsonify({'message': 'new model loaded into classifier'}), 201
 
 
 @socketio.on('connect')
@@ -329,11 +406,6 @@ def connect_live_view():
 @socketio.on('disconnect')
 def disconnect_live_view():
     send('disconnected')
-
-
-@celeryd_init.connect
-def on_celery_init(sender=None, conf=None, **kwargs):
-    run_camera_socket.apply_async()
 
 
 @task_prerun.connect

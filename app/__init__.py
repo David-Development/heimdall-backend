@@ -8,7 +8,6 @@ from flask_appconfig import AppConfig
 from flask_restful import Api
 from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
 from celery import Celery
 import redis
 
@@ -57,6 +56,7 @@ def extensions(flask_app, main):
         socketio.init_app(flask_app,
                           message_queue='redis://')
     else:
+        r.flushdb()
         # Initialize SocketIO to emit events through the message queue.
         # Celery does not use eventlet. Therefore, we have to set async_mode
         # explicitly.
@@ -69,9 +69,17 @@ def extensions(flask_app, main):
 
 def init_models():
     from tasks import create_classifier, load_classifier
-    app.clf = create_classifier()
-    path = app.config['ML_MODEL_PATH'] + os.sep + '*.pkl'
-    latest_model = max(glob.glob(path), key=os.path.getctime)
-    app.clf = load_classifier(latest_model)
-    db_model = models.ClassifierStats.query.order_by(models.ClassifierStats.date.desc()).first()
+
+    db_model = models.ClassifierStats.query.filter_by(loaded=True).first()
+    app.clf = load_classifier(db_model.model_path)
     app.labels = db_model.labels_as_dict()
+
+    if db_model is None:
+        app.clf = create_classifier()
+        path = app.config['ML_MODEL_PATH'] + os.sep + '*.pkl'
+        latest_model = max(glob.glob(path), key=os.path.getctime)
+        app.clf = load_classifier(latest_model)
+        db_model = models.ClassifierStats.query.order_by(models.ClassifierStats.date.desc()).first()
+        app.labels = db_model.labels_as_dict()
+        db_model.loaded = True
+        db.session.commit()

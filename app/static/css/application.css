@@ -8,8 +8,8 @@
 }
 
 img.recent {
-    display: block;
-    max-width: 400px;
+    display: inline-block;
+    max-width: 100%;
     width: auto;
     height: auto;
 }
