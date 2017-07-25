@@ -5,7 +5,9 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
     <script type="text/javascript" src="https://cdn.datatables.net/v/bs/dt-1.10.15/datatables.min.js"></script>
+    <script src="{{ url_for('static', filename='js/application.js') }}"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/font-awesome.min.css') }}">
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/application.css') }}">
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/bs/dt-1.10.15/datatables.min.css"/>
@@ -34,13 +36,23 @@
                 {{ nav_link('galleries', 'Galleries') }}
                 {{ nav_link('liveview', 'Liveview') }}
                 {{ nav_link('recent_classifications', 'Recent Classifications') }}
-                {{ nav_link('task_overview', 'Tasks') }}
                 {{ nav_link('models', 'Model Information') }}
             </ul>
+            <div class="nav navbar-nav navbar-right">
+                <div id="task_state_container">
+                    <span id="state_icon" class="fa fa-cog fa-2x fa-fw"></span>
+                    <div class="task_state_text" style="display:inline-block">
+                        <span id="state"></span>
+                        <span id="step"></span>
+                        <span id="current"></span>
+                    </div>
+                </div>
+
+            </div>
         </div><!-- /.navbar-collapse -->
     </div><!-- /.container-fluid -->
 </nav>
-<div class="container">
+<div class="container-fluid">
     {% block heading %}
         <h1>{% block page %}{% endblock %}</h1>
     {% endblock %}
@@ -51,5 +63,6 @@
         {% endblock %}
     </div>
 </div>
+<script src="{{ url_for('static', filename='js/task_state.js') }}"></script>
 </body>
 </html>

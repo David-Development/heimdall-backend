@@ -7,6 +7,13 @@
         var gallery_id = $('#gallery_select').val();
         var url = '/api/gallery/' + gallery_id + '/images/';
         load_images(url);
+        var text = $('#gallery_select option:selected').text();
+        if (text === 'new' || text === 'unknown') {
+            $('#delete_button').prop("disabled", true);
+        }
+        else {
+            $('#delete_button').prop("disabled", false);
+        }
     };
 
     var imageclick = function () {
@@ -55,9 +62,28 @@
             var option = $('<option />');
             option.val(data.id);
             option.text(data.name);
-            $('#gallery_select').append(option);
+            console.log(option);
             $('#action_select').append(option);
+            $('#gallery_select').append(option.clone());
+            $('#gallery_select').attr('size', $('#gallery_select option').length);
+
         })
+    });
+
+    $('#delete_button').on('click', function () {
+        var gallery_select = $('#gallery_select');
+        var gallery_id = gallery_select.val();
+
+        $.ajax({
+            type: 'DELETE',
+            url: '/api/gallery/' + gallery_id + '/'
+        }).done(function (data) {
+            $('#action_select option[value="' + gallery_id + '"]').remove();
+            $('#gallery_select option:selected').remove();
+            $('#gallery_select').attr('size', $('#gallery_select option').length);
+            gallery_select.find('option:eq(0)').prop('selected', true);
+            gallery_select.trigger('change');
+        });
     });
 
     var load_images = function (url) {

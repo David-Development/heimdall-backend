@@ -12,10 +12,11 @@ $(document).ready(function () {
         var img_src = 'data:image/png;base64,' + result_obj['image'];
         var image_id = result_obj['image_id'];
         image_id_text = '<p>Image ID: ' + result_obj['image_id'] + '</p>';
-        var img_text = '<div class="col-md-8"><img id=' + image_id + ' src=' + img_src + ' class="img-rounded"></div>';
+        var img_text = '<div class="col-md-8"><img id=' + image_id + ' src=' + img_src + ' class="img-rounded recent"></div>';
         var html_result = '<div class="row margin_top well">' + img_text;
+        html_result += '<div class="col-md-4">';
         if (result_obj['classification']['predictions'].length === 0) {
-            html_result += '<div class="col-md-2"><div id="result">' + image_id_text + ' ' +
+            html_result += '<div class="col-md-6"><div id="result">' + image_id_text + ' ' +
                 '<p>No Faces found</p></div></div>';
         }
         else {
@@ -48,11 +49,11 @@ $(document).ready(function () {
                 }
                 probabilities_text += '</p>';
 
-                html_result += '<div class="col-md-2 row"><div id="result' + i + '">' + image_id_text + probabilities_text
+                html_result += '<div class="col-md-6"><div id="result' + i + '">' + image_id_text + probabilities_text
                     + '</div></div>';
 
             }
-            html_result += '</div>'
+            html_result += '</div></div>'
         }
         classification_div.prepend(html_result);
         if (classification_div.children().length > 30) {

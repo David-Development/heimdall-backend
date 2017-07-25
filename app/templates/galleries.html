@@ -5,7 +5,7 @@
 {% endblock %}
 {% block page %}{{ title }}{% endblock %}
 {% block content %}
-    <div class="col-md-3 container">
+    <div class="col-md-2">
         <select id="gallery_select" class="form-control" size="{{ galleries|length }}">
             {% for gallery in galleries %}
                 <option value="{{ gallery.id }}">{{ gallery.name }}</option>
@@ -18,8 +18,9 @@
       </span>
         </div>
     </div>
-    <div class="col-md-9 container" id="images">
+    <div class="col-md-10" id="images">
         <div id="control_div" class="hidden form-inline">
+
             <select id="action_select" class="form-control">
                 <option/>
                 {% for gallery in galleries %}
@@ -27,7 +28,10 @@
                 {% endfor %}
             </select>
             <button id="move_button" class="btn btn-md">Move to selected gallery</button>
+            <button id="delete_button" class="btn btn-md btn-danger">Delete Gallery</button>
+            <span class="text-info">(Images won't get deleted, but moved to 'new' gallery!)</span>
         </div>
+
     </div>
 
     <script src="{{ url_for('static', filename='js/galleries.js') }}"></script>

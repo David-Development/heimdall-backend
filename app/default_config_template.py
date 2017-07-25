@@ -17,7 +17,7 @@ SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 CELERY_BROKER_URL = 'redis://<host>:<port>/0'
 CELERY_RESULT_BACKEND = 'redis://<host>:<port>/0'
-worker_max_memory_per_child = 2000000
+CELERYD_MAX_TASKS_PER_CHILD = 1
 
 IMAGE_FOLDER = 'images'
 NEW_IMAGES_FOLDER = os.path.join(IMAGE_FOLDER, 'new')

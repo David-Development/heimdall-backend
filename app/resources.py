@@ -80,6 +80,10 @@ class GalleryRes(Resource):
         name = parsed_args['name']
         gallery = Gallery(name=name, path=os.path.join(config['SUBJECT_IMAGES_FOLDER'], name))
 
+        # prevent empty name
+        if name is None or name is '':
+            abort(409, description="A gallery must have a name!");
+
         try:
             db.session.add(gallery)
             db.session.commit()
@@ -102,6 +106,8 @@ class GalleryRes(Resource):
             image.gallery_id = gallery_new.id
             image.path = os.path.join(gallery_new.path, image.name)
 
+        # Delete all Results for this Person/Gallery
+        Result.query.filter_by(gallery_id=gallery_id).delete()
         Gallery.query.filter_by(id=gallery_id).delete()
         db.session.commit()
 
@@ -177,7 +183,7 @@ def liveview():
 
 @app.route("/galleries")
 def galleries():
-    gls = Gallery.query.all()
+    gls = Gallery.query.order_by(Gallery.id.asc()).all()
     return render_template('galleries.html', title="Person Galleries", galleries=gls)
 
 
@@ -193,15 +199,15 @@ def recent_classifications():
                            classifications=classifications)
 
 
-@app.route("/tasks")
+@app.route("/api/tasks/")
 def task_overview():
     tasks = {}
     for key in r.keys():
         content = r.hgetall(key)
         if key == 'app.tasks.train_recognizer':
-            print content.keys()
             content['task_url'] = url_for('recognizer_training_status', task_id=content['task_id'])
         tasks[key] = content
+        content['details'] = get_recognizer_training_status(content['task_id'])
 
     return jsonify(tasks), 201
 
@@ -292,8 +298,7 @@ def new_live_image():
     if parsed_args['annotate'] is not None:
         if parsed_args['annotate'] == u'False':
             annotate = False
-
-    filename = str(time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())) + '.jpg'
+    filename = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')[:-3]) + '.jpg'
     id = new_image(image, filename)
     with app.app_context():
         url = url_for('classify_db_image', image_id=id, _external=True)
@@ -370,6 +375,21 @@ def recognizer_training_status(task_id):
     return jsonify(response)
 
 
+def get_recognizer_training_status(task_id):
+    task = train_recognizer.AsyncResult(task_id)
+    response = {
+        'state': task.state,
+        'current': task.info.get('current'),
+        'total': task.info.get('total'),
+        'step': task.info.get('step', ''),
+        'model': task.info.get('model', '')
+    }
+    if 'result' in task.info:
+        response['result'] = task.info['result']
+
+    return response
+
+
 @app.route("/api/classifier/load/", methods=['POST'])
 def load_new_classifier():
     path = config['ML_MODEL_PATH'] + os.sep + '*.pkl'
@@ -406,6 +426,12 @@ def connect_live_view():
 @socketio.on('disconnect')
 def disconnect_live_view():
     send('disconnected')
+
+
+@task_postrun.connect
+def on_task_postrun(task_id, task, retval, *args, **kwargs):
+    content = {'task_id': task_id, 'status': 'Finished'}
+    r.hmset(task.name, content)
 
 
 @task_prerun.connect

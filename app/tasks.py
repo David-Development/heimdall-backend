@@ -6,6 +6,7 @@ import time
 import datetime
 import multiprocessing
 import base64
+import gc
 
 import requests
 from flask import url_for, json
@@ -196,7 +197,7 @@ def models_exist():
     return dlib_shape_predictor and dlib_face_descriptor
 
 
-@celery.task(bind=True, time_limit=200)
+@celery.task(bind=True)
 def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
     classifier = create_classifier(clf_type, n_jobs, k)
     X, y, folder_names = utils.load_dataset(config['SUBJECTS_BASE_PATH'], grayscale=False)
@@ -261,6 +262,9 @@ def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
     with app.app_context():
         url = url_for('load_new_classifier', _external=True)
     requests.post(url)
+
+    del X, y, transformed
+    gc.collect()
 
     return {'current': total_images, 'total': total_images, 'step': 'Training',
             'result': 'Training finished'}
