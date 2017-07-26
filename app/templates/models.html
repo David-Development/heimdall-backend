@@ -24,6 +24,7 @@
                 <th>Training time</th>
                 <th>Date</th>
                 <th>Change Model</th>
+                <th>Delete Model</th>
             </tr>
             </thead>
             <tbody>
@@ -42,7 +43,12 @@
                     <td>{{ model.date }}</td>
                     <td>
                         <button id="{{ model.id }}" data-id="{{ model.id }}"
-                                class="btn btn-md btn-info model-change">Use Model
+                                class="btn btn-md btn-info model-change" {{ "disabled" if model.loaded }}>Use Model
+                        </button>
+                    </td>
+                    <td>
+                        <button id="{{ model.id }}" data-id="{{ model.id }}"
+                                class="btn btn-md btn-danger model-delete" {{ "disabled" if model.loaded }}>Delete Model
                         </button>
                     </td>
                 </tr>

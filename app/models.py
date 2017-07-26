@@ -23,6 +23,7 @@ class Gallery(db.Model):
 
     @hybrid_property
     def images_count(self):
+        db.session.remove(self.images)
         return self.images.count()
 
     def __repr__(self):
@@ -117,7 +118,7 @@ class ClassificationResults(db.Model):
     __tablename__ = 'classificationresults'
 
     id = db.Column(db.Integer, primary_key=True)
-    clf_id = db.Column(db.Integer, db.ForeignKey('classifierstats.id'))
+    clf_id = db.Column(db.Integer, db.ForeignKey('classifierstats.id', ondelete='CASCADE'))
     image_id = db.Column(db.Integer, db.ForeignKey('image.id'))
     image = db.relationship("Image")
     results = db.relationship('Result', backref='classificationresults', lazy='dynamic')
@@ -133,7 +134,7 @@ class Result(db.Model):
     __tablename__ = 'result'
 
     id = db.Column(db.Integer, primary_key=True)
-    classification = db.Column(db.Integer, db.ForeignKey('classificationresults.id'))
+    classification = db.Column(db.Integer, db.ForeignKey('classificationresults.id', ondelete='CASCADE'))
     gallery_id = db.Column(db.Integer, db.ForeignKey('gallery.id'))
     gallery = db.relationship('Gallery')
     probability = db.Column(db.Float)

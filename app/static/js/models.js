@@ -12,14 +12,26 @@
 
 
     $('#model_table tbody').on('click', '.model-change', function () {
-        var data = $(this).data('id');
         var url = "/api/classifier/load/" + $(this).data('id');
         $.ajax({
             type: 'POST',
             url: url
         }).done(function () {
             location.reload();
-        })
+        });
+    });
+
+    $('#model_table tbody').on('click', '.model-delete', function () {
+        var url = '/api/classifier/delete/' + $(this).data('id');
+
+        $.ajax({
+            type: 'DELETE',
+            url: url
+        }).done(function (data) {
+            console.log(data);
+            location.reload();
+        });
+
     });
 
     $('#train_model').on('click', function () {

@@ -18,7 +18,7 @@ import numpy as np
 import cv2
 
 from app import db, app, celery, recognizer, socketio, clf
-from models import Gallery, Image, ClassifierStats, Labels
+from models import Gallery, Image, ClassifierStats, Labels, ClassificationResults
 
 from recognition import utils, augmenter
 
@@ -103,6 +103,23 @@ def move_gallery_content(src_gallery, dest_gallery):
 
     for file_path in os.listdir(src_path):
         shutil.move(os.path.join(src_path, file_path), os.path.join(dest_path, file_path))
+
+
+def clear_gallery(gallery):
+    """
+    Removes all images from the gallery
+    :param gallery: the gallery to be cleared
+    :return: 
+    """
+    basedir = config['BASEDIR']
+    for image in gallery.images:
+        ClassificationResults.query.filter_by(image=image).delete()
+        if os.path.isfile(os.path.join(basedir, image.path)):
+            os.remove(os.path.join(basedir, image.path))
+
+    gallery.images = []
+
+    db.session.commit()
 
 
 def move_images(gallery, images):

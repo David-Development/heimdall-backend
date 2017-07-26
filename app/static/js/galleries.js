@@ -10,9 +10,11 @@
         var text = $('#gallery_select option:selected').text();
         if (text === 'new' || text === 'unknown') {
             $('#delete_button').prop("disabled", true);
+            $('#clear_button').show()
         }
         else {
             $('#delete_button').prop("disabled", false);
+            $('#clear_button').hide()
         }
     };
 
@@ -86,6 +88,20 @@
         });
     });
 
+    $('#clear_button').on('click', function () {
+        var gallery_id = $('#gallery_select').val();
+        console.log(gallery_id);
+
+        $.ajax({
+            type: 'POST',
+            url: '/api/gallery/' + gallery_id + '/clear'
+        }).done(function (data) {
+            console.log(data);
+            gallery_select.trigger('change');
+        });
+
+    });
+
     var load_images = function (url) {
         var images = [];
         $.getJSON(url, {}, function (data) {
@@ -110,8 +126,10 @@
         });
 
     };
-
-    $('#gallery_select').on('change', load_selected_gallery);
+    var gallery_select = $('#gallery_select');
+    gallery_select.on('change', load_selected_gallery);
+    gallery_select.find('option:eq(0)').prop('selected', true);
+    gallery_select.trigger('change');
 
 
 })(jQuery);

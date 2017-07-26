@@ -15,7 +15,7 @@ from models import Gallery, Image, ClassifierStats, ClassificationResults, Resul
 from app import api, app, db, recognizer, clf, labels, socketio, celery, r
 from recognition import utils
 from tasks import (sync_db_from_filesystem, delete_gallery, move_images, download_models, models_exist,
-                   train_recognizer, load_classifier, classify, new_image, annotate_image)
+                   train_recognizer, load_classifier, classify, new_image, annotate_image, clear_gallery)
 
 config = app.config
 
@@ -82,7 +82,7 @@ class GalleryRes(Resource):
 
         # prevent empty name
         if name is None or name is '':
-            abort(409, description="A gallery must have a name!");
+            abort(409, description="A gallery must have a name!")
 
         try:
             db.session.add(gallery)
@@ -169,6 +169,18 @@ api.add_resource(GalleryImagesListRes, '/api/gallery/<gallery_id>/images/')
 api.add_resource(GalleryListRes, '/api/galleries/')
 api.add_resource(ImageListRes, '/api/images/')
 api.add_resource(ModelListRes, '/api/models/')
+
+
+@app.route("/api/gallery/<gallery_id>/clear", methods=['POST'])
+def clear_selected_gallery(gallery_id):
+    print gallery_id
+    gallery = Gallery.query.filter_by(id=gallery_id).first()
+    if gallery is None:
+        abort(409, description="Gallery not found")
+
+    clear_gallery(gallery)
+
+    return jsonify({'message': 'gallery cleared'})
 
 
 @app.route("/")
@@ -416,6 +428,24 @@ def load_db_classifier(model_id):
     db.session.commit()
 
     return jsonify({'message': 'new model loaded into classifier'}), 201
+
+
+@app.route("/api/classifier/delete/<model_id>", methods=['DELETE'])
+def delete_classifier_model(model_id):
+    model = ClassifierStats.query.filter_by(id=model_id).first()
+    if model is None:
+        abort(409, descripction="Model not found.")
+    if model.loaded:
+        abort(409, descripction="Model is currently loaded, load other Model before deleting.")
+    try:
+        if os.path.isfile(model.model_path):
+            os.remove(model.model_path)
+        db.session.delete(model)
+
+    except IOError:
+        abort(409, description="Error occured while deleting model file from disk")
+    db.session.commit()
+    return jsonify({'message': 'model deleted'}), 200
 
 
 @socketio.on('connect')
