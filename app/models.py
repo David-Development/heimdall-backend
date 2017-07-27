@@ -138,8 +138,21 @@ class Result(db.Model):
     gallery_id = db.Column(db.Integer, db.ForeignKey('gallery.id'))
     gallery = db.relationship('Gallery')
     probability = db.Column(db.Float)
+    x = db.Column(db.Integer)
+    y = db.Column(db.Integer)
+    w = db.Column(db.Integer)
+    h = db.Column(db.Integer)
 
-    def __init__(self, classification, gallery_id, probability):
+    def __init__(self, classification, gallery_id, probability, bounding_box=None):
         self.classification = classification
         self.gallery_id = gallery_id
         self.probability = probability
+        if bounding_box is not None:
+            self.x = bounding_box[0]
+            self.y = bounding_box[1]
+            self.w = bounding_box[2]
+            self.h = bounding_box[3]
+
+    @hybrid_property
+    def bounding_box(self):
+        return [self.x, self.y, self.w, self.h]

@@ -383,7 +383,7 @@ def classify(classifier, image, dists=False, neighbors=None):
     return results, bbs
 
 
-def annotate_image(image, classification_result):
+def annotate_live_image(image, classification_result):
     image = base64.b64decode(image)
     image = np.fromstring(image, dtype=np.uint8)
     image = cv2.imdecode(image, cv2.IMREAD_COLOR)
@@ -402,3 +402,29 @@ def annotate_image(image, classification_result):
                             cv2.FONT_HERSHEY_SIMPLEX, 1, color, thickness=2)
 
     return base64.b64encode(cv2.imencode('.jpg', image)[1])
+
+
+@app.context_processor
+def annotate_processor():
+    def annotate_db_image(classification_result):
+        image = cv2.imread(os.path.join(config['BASEDIR'], classification_result.image.path))
+
+        for result in classification_result.results:
+            bb = result.bounding_box
+            name = result.gallery.name
+            prob = result.probability
+
+            if name == 'unknown':
+                text = name
+                color = (0, 0, 255)
+            else:
+                text = name + ': ' + str(round(prob, 2))
+                color = (0, 255, 0)
+            image = cv2.rectangle(image, pt1=(bb[0], bb[1]), pt2=(bb[0] + bb[2], bb[1] + bb[3]), color=color,
+                                  thickness=1)
+            image = cv2.putText(image, text, (bb[0], bb[1] + bb[3] + 30),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1, color, thickness=2)
+
+        return base64.b64encode(cv2.imencode('.jpg', image)[1])
+
+    return dict(annotate_db_image=annotate_db_image)

@@ -9,7 +9,7 @@ $(document).ready(function () {
     socket.on('new_image', function (msg) {
         console.log("Received image");
         result_obj = $.parseJSON(msg);
-        var img_src = 'data:image/png;base64,' + result_obj['image'];
+        var img_src = 'data:image/jpg;base64,' + result_obj['image'];
         var image_id = result_obj['image_id'];
         image_id_text = '<p>Image ID: ' + result_obj['image_id'] + '</p>';
         var img_text = '<div class="col-md-8"><img id=' + image_id + ' src=' + img_src + ' class="img-rounded recent"></div>';

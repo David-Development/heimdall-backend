@@ -9,12 +9,23 @@
         {% for row in classifications %}
             <div class="row margin_top well">
                 <div class="col-md-4 container">
-                    <img class="img-rounded recent" src={{ row.image.url }}>
+                    <img class="img-rounded recent" src={{ "data:image/jpg;base64," +  annotate_db_image(row) }}>
                 </div>
                 <div class="col-md-4 container">
                     <ul class="list-group">
                         {% for result in row.results %}
-                            <li class="list-group-item">{{ result.gallery.name }}</li>
+                            <li class="list-group-item">
+                                <span id="gallery-id">
+                                    {{ result.gallery.name +": " }}
+                                </span>
+                                <span>{{ result.probability|round(3) }}</span>
+                                <select id="action_select" class="form-control">
+                                    <option/>
+                                    {% for gallery in galleries %}
+                                        <option value="{{ gallery.id }}">{{ gallery.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </li>
                         {% endfor %}
                     </ul>
                 </div>

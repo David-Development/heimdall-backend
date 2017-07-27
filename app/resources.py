@@ -15,7 +15,7 @@ from models import Gallery, Image, ClassifierStats, ClassificationResults, Resul
 from app import api, app, db, recognizer, clf, labels, socketio, celery, r
 from recognition import utils
 from tasks import (sync_db_from_filesystem, delete_gallery, move_images, download_models, models_exist,
-                   train_recognizer, load_classifier, classify, new_image, annotate_image, clear_gallery)
+                   train_recognizer, load_classifier, classify, new_image, annotate_live_image, clear_gallery)
 
 config = app.config
 
@@ -173,7 +173,6 @@ api.add_resource(ModelListRes, '/api/models/')
 
 @app.route("/api/gallery/<gallery_id>/clear", methods=['POST'])
 def clear_selected_gallery(gallery_id):
-    print gallery_id
     gallery = Gallery.query.filter_by(id=gallery_id).first()
     if gallery is None:
         abort(409, description="Gallery not found")
@@ -201,14 +200,10 @@ def galleries():
 
 @app.route("/classifications")
 def recent_classifications():
-    classifications = ClassificationResults.query.order_by(ClassificationResults.date.desc()).limit(30).all()
-    for classification in classifications:
-        print classification.image.path
-        for result in classification.results:
-            print result.gallery
-
+    classifications = ClassificationResults.query.order_by(ClassificationResults.date.desc()).limit(50).all()
+    gls = Gallery.query.all()
     return render_template('recent_classifications.html', title="Recent Classifications",
-                           classifications=classifications)
+                           classifications=classifications, galleries=gls)
 
 
 @app.route("/api/tasks/")
@@ -317,7 +312,7 @@ def new_live_image():
     r = requests.get(url)
     result = r.json()
     if len(result['predictions']) > 0 and annotate:
-        image = annotate_image(image, result)
+        image = annotate_live_image(image, result)
 
     socketio.emit('new_image', json.dumps({'image': image,
                                            'image_id': id,
@@ -352,7 +347,8 @@ def classify_db_image(image_id):
         else:
             label = app.labels[highest]
         gallery = Gallery.query.filter_by(name=label).first()
-        db.session.add(Result(classification=classification_result.id, gallery_id=gallery.id, probability=prob))
+        db.session.add(
+            Result(classification=classification_result.id, gallery_id=gallery.id, probability=prob, bounding_box=bb))
         prediction_dict = {}
         prediction_result_dict = {'highest': label,
                                   'bounding_box': bb,
@@ -389,15 +385,21 @@ def recognizer_training_status(task_id):
 
 def get_recognizer_training_status(task_id):
     task = train_recognizer.AsyncResult(task_id)
-    response = {
-        'state': task.state,
-        'current': task.info.get('current'),
-        'total': task.info.get('total'),
-        'step': task.info.get('step', ''),
-        'model': task.info.get('model', '')
-    }
-    if 'result' in task.info:
-        response['result'] = task.info['result']
+    if task.info is None:
+        response = {
+            'state': task.state
+        }
+    else:
+        response = {
+            'state': task.state,
+            'current': task.info.get('current'),
+            'total': task.info.get('total'),
+            'step': task.info.get('step', ''),
+            'model': task.info.get('model', '')
+        }
+
+        if 'result' in task.info:
+            response['result'] = task.info['result']
 
     return response
 
