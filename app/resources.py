@@ -48,6 +48,12 @@ image_fields = {
     'gallery_name': fields.String(attribute='gallery.name'),
     'date': fields.DateTime(attribute='createdate'),
 }
+label_fields = {
+    'id': fields.Integer,
+    'clf_id': fields.Integer,
+    'num': fields.Integer,
+    'label': fields.String,
+}
 
 model_fields = {
     'id': fields.Integer,
@@ -60,7 +66,10 @@ model_fields = {
     'total_no_faces': fields.Integer,
     'loaded': fields.Boolean,
     'num_classes': fields.Integer,
-    'training_time': fields.Integer
+    'training_time': fields.Integer,
+    'confusion_url': fields.String,
+    'learning_curve_url': fields.String,
+    'labels': fields.List(fields.Nested(label_fields))
 }
 
 model_list_fields = {
@@ -167,11 +176,19 @@ class ModelListRes(Resource):
         return {'data': res}, 200
 
 
+class ModelRes(Resource):
+    @marshal_with(model_fields)
+    def get(self, model_id):
+        res = ClassifierStats.query.filter_by(id=model_id).first()
+        return res, 200
+
+
 api.add_resource(GalleryRes, '/api/gallery/', '/api/gallery/<gallery_id>/')
 api.add_resource(GalleryImagesListRes, '/api/gallery/<gallery_id>/images/')
 api.add_resource(GalleryListRes, '/api/galleries/')
 api.add_resource(ImageListRes, '/api/images/')
 api.add_resource(ModelListRes, '/api/models/')
+api.add_resource(ModelRes, '/api/model/<model_id>/')
 
 
 @app.route("/api/gallery/<gallery_id>/clear", methods=['POST'])

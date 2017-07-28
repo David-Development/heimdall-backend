@@ -77,10 +77,13 @@ class ClassifierStats(db.Model):
     training_time = db.Column(db.Integer)
     # is model currently loaded/used
     loaded = db.Column(db.Boolean)
+    # path to confusion plot
+    confusion_matrix = db.Column(db.String())
+    # path to learning curve plot
+    learning_curve = db.Column(db.String())
 
     def __init__(self, name, classifier_type, model_path, date, num_classes, cv_score=None, total_images=None,
-                 avg_base_img=None,
-                 total_no_face=None, training_time=None):
+                 avg_base_img=None, total_no_face=None, training_time=None, confusion_matrix=None, learning_curve=None):
         self.name = name
         self.classifier_type = classifier_type
         self.model_path = model_path
@@ -91,6 +94,8 @@ class ClassifierStats(db.Model):
         self.avg_base_img = avg_base_img
         self.total_no_face = total_no_face
         self.training_time = training_time
+        self.confusion_matrix = confusion_matrix
+        self.learning_curve = learning_curve
 
     @hybrid_method
     def labels_as_dict(self):
@@ -99,6 +104,18 @@ class ClassifierStats(db.Model):
             label_dict[label.num] = label.label
 
         return label_dict
+
+    @hybrid_property
+    def confusion_url(self):
+        path_components = self.confusion_matrix.split(os.sep)
+        starting_index = path_components.index('images')
+        return '/'.join(path_components[starting_index:])
+
+    @hybrid_property
+    def learning_curve_url(self):
+        path_components = self.learning_curve.split(os.sep)
+        starting_index = path_components.index('images')
+        return '/'.join(path_components[starting_index:])
 
 
 class Labels(db.Model):

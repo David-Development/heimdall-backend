@@ -14,6 +14,9 @@ from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import GridSearchCV, cross_val_score
 from sklearn.externals import joblib
+from scikitplot import plotters as skplt
+from scikitplot import classifier_factory
+import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 
@@ -220,6 +223,7 @@ def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
     X, y, folder_names = utils.load_dataset(config['SUBJECTS_BASE_PATH'], grayscale=False)
     avg_images = np.mean(np.unique(y, return_counts=True)[1])
 
+    start = time.time()
     X, y = augment_images(X, y, target=config['NUM_TARGET_IMAGES'], celery_binding=self)
     label_dict = utils.create_label_dict(y, folder_names)
     total_images = len(y)
@@ -228,7 +232,7 @@ def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
     cv_score = None
     transformed = []
     labels = []
-    start = time.time()
+
     for data in zip(X, y):
         image = data[0]
         label = data[1]
@@ -256,15 +260,25 @@ def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
     classifier.fit(transformed, labels)
 
     training_time = time.time() - start
-
     timestamp = time.strftime('%Y%m%d%H%M%S')
-    filename = clf_type + timestamp + '.pkl'
-    path = os.path.join(config['ML_MODEL_PATH'], filename)
+    filename = clf_type + timestamp
+    full_filename = filename + '.pkl'
+    path = os.path.join(config['ML_MODEL_PATH'], full_filename)
+
+    preds = classifier.predict(transformed)
+    skplt.plot_confusion_matrix(y_true=labels, y_pred=preds)
+    confusion_path = os.path.join(config['PLOTS_BASE_PATH'], filename + '_confusion.png')
+    plt.savefig(confusion_path, bbox_inches='tight')
+
+    skplt.plot_learning_curve(classifier, transformed, labels)
+    learning_curve_path = os.path.join(config['PLOTS_BASE_PATH'], filename + '_learning.png')
+    plt.savefig(learning_curve_path, bbox_inches='tight')
 
     stats = ClassifierStats(name=clf_type + timestamp, classifier_type=clf_type, model_path=path,
                             date=datetime.datetime.now(), cv_score=cv_score, total_images=total_images,
                             total_no_face=no_face, training_time=training_time, avg_base_img=avg_images,
-                            num_classes=len(folder_names))
+                            num_classes=len(folder_names), confusion_matrix=confusion_path,
+                            learning_curve=learning_curve_path)
     db.session.add(stats)
     # flush to generate stats id
     db.session.flush()

@@ -46,6 +46,31 @@
     });
 
 
+    $('#plotModal').on('show.bs.modal', function (event) {
+        var button = $(event.relatedTarget); // Button that triggered the modal
+        var model_id = button.data('id'); // Extract info from data-* attributes
+        var url = '/api/model/' + model_id;
+        var modal = $(this);
+        var labels = [];
+        $.getJSON(url, function (data) {
+
+            $.each(data.labels, function(idx, lbl){
+               labels.push(lbl.num + ": " + lbl.label);
+            });
+
+            modal.find('#confusion_plot').attr('src', data.confusion_url);
+            modal.find('#learning_curve').attr('src', data.learning_curve_url);
+
+            modal.find('#label_dict').text(labels);
+        });
+        // If necessary, you could initiate an AJAX request here (and then do the updating in a callback).
+        // Update the modal's content. We'll use jQuery here, but you could use a data binding library or other methods instead.
+
+        //modal.find('.modal-title').text('New message to ' + recipient)
+        //modal.find('.modal-body input').val(recipient)
+    });
+
+
     TaskUpdater.register_event(function (running) {
         $('#train_model').prop('disabled', running);
 

@@ -89,5 +89,15 @@ li.recent {
 
 /* Hidden placeholder */
 select option[disabled]:first-child {
-	display: none;
+    display: none;
+}
+
+@media screen and (min-width: 768px) {
+    .modal-dialog {
+        width: 80%; /* New width for default modal */
+    }
+}
+
+.modal {
+  text-align: center;
 }

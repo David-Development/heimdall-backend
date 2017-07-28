@@ -5,6 +5,47 @@
 {% endblock %}
 {% block page %}{{ title }}{% endblock %}
 {% block content %}
+
+
+    <div class="modal fade" id="plotModal" tabindex="-1" role="dialog" aria-labelledby="plotModalLabel">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span
+                            aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title" id="plotModalLabel">Plots for selected model</h4>
+                    <h6 class="modal-title">Experimental and slightly inaccurate</h6>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted bg-warning well-sm">Left plot is a confusion matrix for all the classes that
+                        the model knows. The corresponding labels for the classes are shown below. The shown confusions
+                        and scores are not necessarily equal to the cv_score of the real model, as the calculations are
+                        slightly different (real model uses
+                        <a href="http://scikit-learn.org/stable/modules/generated/sklearn.svm.SVC.html#sklearn.svm.SVC.predict_proba">
+                            probabilities</a> which the function for the plot is not able to use.).To the right is a
+                        learning curve, which shows the accuracy of the classifier with different amounts of training
+                        data (20% Steps, with a 3-Fold CV for each).
+                    </p>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <img id="confusion_plot" src="">
+                        </div>
+                        <div class="col-md-6">
+                            <img id="learning_curve" src="">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <span id="label_dict"></span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <p class="text-muted bg-info well-sm">Overview of trained models. New Models can be trained and will automatically
         loaded when the training is finished. Automatic reloading is unfortunately not yet implemented. Older models can
         be loaded and deleted.
@@ -31,6 +72,7 @@
                 <th>Current model</th>
                 <th>Training time</th>
                 <th>Date</th>
+                <th>Model Plots</th>
                 <th>Change Model</th>
                 <th>Delete Model</th>
             </tr>
@@ -49,6 +91,11 @@
                     <td>{{ model.loaded }}</td>
                     <td>{{ model.training_time }}</td>
                     <td>{{ model.date }}</td>
+                    <td>
+                        <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#plotModal"
+                                data-id="{{ model.id }}">Open model plots
+                        </button>
+                    </td>
                     <td>
                         <button id="{{ model.id }}" data-id="{{ model.id }}"
                                 class="btn btn-md btn-info model-change" {{ "disabled" if model.loaded }}>Use Model
