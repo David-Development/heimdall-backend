@@ -7,6 +7,12 @@
 {% endblock %}
 {% block page %}{{ title }}{% endblock %}
 {% block content %}
+    <div class="container">
+        <p class="text-muted bg-info well-sm">Liveview for new images. If an image is posted to '/api/live/', a face
+            detection and recognition is performed and the results shown here. Previous classifications are available at
+            the <a href={{ url_for('recent_classifications') }}>recent classifications</a> tab.
+        </p>
+    </div>
     <div class="col-md-3">
 
     </div>

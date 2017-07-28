@@ -5,6 +5,14 @@
 {% endblock %}
 {% block page %}{{ title }}{% endblock %}
 {% block content %}
+    <p class="text-muted bg-info well-sm">Overview of trained models. New Models can be trained and will automatically
+        loaded when the training is finished. Automatic reloading is unfortunately not yet implemented. Older models can
+        be loaded and deleted.
+    </p>
+    <p class="text-muted bg-warning well-sm">Do not load models if the constellation of galleries/persons has changed
+        since training! I.e: if a gallery was deleted or added. The behaviour afterwards might be wrong and/or errors
+        might occur.
+    </p>
     <div class="col-md-12">
         <button class="btn btn-info" id="train_model" disabled="disabled">Start Training</button>
     </div>
@@ -56,5 +64,8 @@
             </tbody>
         </table>
     </div>
+    <p class="text-muted well-sm">* Total number of images after augmentation. The target image number is
+        defined by the configuration file (Default: 50).
+    </p>
     <script src="{{ url_for('static', filename='js/models.js') }}"></script>
 {% endblock %}

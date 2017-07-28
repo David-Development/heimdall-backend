@@ -36,6 +36,7 @@ gallery_fields = {
     'path': fields.String,
     'images': fields.Integer(attribute='images_count'),
     'subject_gallery': fields.Boolean,
+    'date': fields.DateTime(attribute='createdate'),
 }
 
 image_fields = {
@@ -45,6 +46,7 @@ image_fields = {
     'url': fields.String,
     'gallery_id': fields.Integer(attribute='gallery.id'),
     'gallery_name': fields.String(attribute='gallery.name'),
+    'date': fields.DateTime(attribute='createdate'),
 }
 
 model_fields = {
@@ -144,6 +146,7 @@ class ImageListRes(Resource):
         for image in images:
             image.gallery_id = gallery_id
             image.path = os.path.join(gallery.path, image.name)
+            ClassificationResults.query.filter_by(image_id=image.id).delete()
 
         db.session.commit()
 

@@ -120,6 +120,7 @@
             var img = $('<img />');
             img.attr('src', image.url);
             img.attr('id', image.id);
+            img.attr('title', image.date);
             img.addClass('galleryview');
             img.on('click', imageclick);
             image_div.append(img);
@@ -130,6 +131,7 @@
     gallery_select.on('change', load_selected_gallery);
     gallery_select.find('option:eq(0)').prop('selected', true);
     gallery_select.trigger('change');
+    $('.galleryview').tooltip();
 
 
 })(jQuery);

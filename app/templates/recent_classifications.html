@@ -6,30 +6,63 @@
 {% block page %}{{ title }}{% endblock %}
 {% block content %}
     <div class="container">
-        {% for row in classifications %}
-            <div class="row margin_top well">
-                <div class="col-md-4 container">
-                    <img class="img-rounded recent" src={{ "data:image/jpg;base64," +  annotate_db_image(row) }}>
-                </div>
-                <div class="col-md-4 container">
-                    <ul class="list-group">
-                        {% for result in row.results %}
-                            <li class="list-group-item">
+        <p class="text-muted bg-info well-sm">Overview of recent classification results. For images with a single
+            person, a correction is
+            possible. If the person was recognized correctly, click on 'Correct Person' to move the image directly to
+            the gallery of the person. If the person in the image was recognized wrongly or is unknown, choose the
+            gallery of the correct person (or 'unknown') and click 'Wrong Person' to move the image to the chosen
+            gallery. After the choices for all applicable classification results have been made, the training should be
+            started at the <a href={{ url_for('models') }}>Models</a> tab, to incorporate the new information.
+        </p>
+        <div id="classifications">
+            {% for row in classifications %}
+                <div id="{{ row.image_id|string }}" class="row margin_top well">
+                    <p class="lead">{{ row.date }}</p>
+                    <div class="col-md-4">
+                        <img class="img-rounded recent" src={{ "data:image/jpg;base64," +  annotate_db_image(row) }}>
+                    </div>
+                    <div class="col-md-8">
+                        <ul class="list-group">
+                            {% for result in row.results %}
+                                <li class="list-group-item">
                                 <span id="gallery-id">
                                     {{ result.gallery.name +": " }}
                                 </span>
-                                <span>{{ result.probability|round(3) }}</span>
-                                <select id="action_select" class="form-control">
-                                    <option/>
-                                    {% for gallery in galleries %}
-                                        <option value="{{ gallery.id }}">{{ gallery.name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </li>
-                        {% endfor %}
-                    </ul>
+                                    <span>{{ result.probability|round(3) }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                        {% if row.num_persons == 1 %}
+                            <div id="control_div" class="form-inline">
+                                <div id="left-controls" class="col-md-3">
+                                    <button id="correct_button" data-id="{{ row.image_id|string }}"
+                                            data-gallery-id="{{ row.results[0].gallery.id }}"
+                                            class="btn btn-success btn-md">Correct Person
+                                    </button>
+                                </div>
+                                <div class="col-md-4"></div>
+                                <div id="right-controls" class="col-md-5">
+                                    <select id={{ "wrong_select_" + row.image_id|string }} class="form-control">
+                                        <option value="-1" selected disabled>Choose Person</option>
+                                        {% for gallery in galleries %}
+                                            {% if gallery.name != 'new' %}
+                                                <option value="{{ gallery.id }}">{{ gallery.name }}</option>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </select>
+
+                                    <button id="wrong_button" class="btn btn-md btn-danger"
+                                            data-id="{{ row.image_id|string }}">
+                                        Wrong Person
+                                    </button>
+                                </div>
+
+                            </div>
+                        {% endif %}
+                    </div>
                 </div>
-            </div>
-        {% endfor %}
+            {% endfor %}
+        </div>
     </div>
+    <script src="{{ url_for('static', filename='js/recent_classifications.js') }}"></script>
 {% endblock %}

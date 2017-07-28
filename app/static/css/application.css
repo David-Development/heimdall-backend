@@ -86,3 +86,8 @@ li.recent {
 #state_icon {
     vertical-align: middle;
 }
+
+/* Hidden placeholder */
+select option[disabled]:first-child {
+	display: none;
+}

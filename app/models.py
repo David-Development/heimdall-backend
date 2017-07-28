@@ -23,7 +23,6 @@ class Gallery(db.Model):
 
     @hybrid_property
     def images_count(self):
-        db.session.remove(self.images)
         return self.images.count()
 
     def __repr__(self):
@@ -128,6 +127,10 @@ class ClassificationResults(db.Model):
         self.clf_id = clf_id
         self.image_id = image_id
         self.date = date
+
+    @hybrid_property
+    def num_persons(self):
+        return self.results.count()
 
 
 class Result(db.Model):
