@@ -22,10 +22,12 @@ CELERYD_MAX_TASKS_PER_CHILD = 1
 IMAGE_FOLDER = 'images'
 NEW_IMAGES_FOLDER = os.path.join(IMAGE_FOLDER, 'new')
 SUBJECT_IMAGES_FOLDER = os.path.join(IMAGE_FOLDER, 'subjects')
+PLOTS_FOLDER = os.path.join(IMAGE_FOLDER, 'model_plots')
 UNKNOWN_IMAGES_FOLDER = os.path.join(SUBJECT_IMAGES_FOLDER, 'unknown')
 
 ML_MODEL_PATH = os.path.join(BASEDIR, 'ml_models')
 IMAGE_BASE_PATH = os.path.join(BASEDIR, IMAGE_FOLDER)
+PLOTS_BASE_PATH = os.path.join(BASEDIR, PLOTS_FOLDER)
 NEW_IMAGES_PATH = os.path.join(IMAGE_BASE_PATH, 'new')
 SUBJECTS_BASE_PATH = os.path.join(IMAGE_BASE_PATH, 'subjects')
 UNKNOWN_IMAGES_PATH = os.path.join(SUBJECTS_BASE_PATH, 'unknown')

@@ -18,5 +18,7 @@ scikit-learn==0.18.2
 pillow==4.2.1
 requests=2.18.1
 eventlet=0.21.0
+matplotlib=2.0.2
+scikit-plot=0.2.7
 
 
