@@ -6,6 +6,9 @@ from sqlalchemy.ext.hybrid import hybrid_property, hybrid_method
 
 
 class Gallery(db.Model):
+    """
+    Represents a gallery of a person.
+    """
     __tablename__ = 'gallery'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -30,6 +33,9 @@ class Gallery(db.Model):
 
 
 class Image(db.Model):
+    """
+    Represents an image.
+    """
     __tablename__ = 'image'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -40,6 +46,9 @@ class Image(db.Model):
 
     @property
     def url(self):
+        """
+        create an url for this image
+        """
         path_components = self.path.split(os.sep)
         return '/'.join(path_components)
 
@@ -51,6 +60,9 @@ class Image(db.Model):
 
 
 class ClassifierStats(db.Model):
+    """
+    Represents a trained model and its attributes
+    """
     __tablename__ = 'classifierstats'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -99,6 +111,10 @@ class ClassifierStats(db.Model):
 
     @hybrid_method
     def labels_as_dict(self):
+        """
+        Creates a dictionary for the number labels of the trained model to person names.
+        :return: dictionary for numbers to labels
+        """
         label_dict = {}
         for label in self.labels:
             label_dict[label.num] = label.label
@@ -107,18 +123,29 @@ class ClassifierStats(db.Model):
 
     @hybrid_property
     def confusion_url(self):
+        """
+        url to the confusion matrix image
+        :return: 
+        """
         path_components = self.confusion_matrix.split(os.sep)
         starting_index = path_components.index('images')
         return '/'.join(path_components[starting_index:])
 
     @hybrid_property
     def learning_curve_url(self):
+        """
+        url to the learning curve image
+        :return: 
+        """
         path_components = self.learning_curve.split(os.sep)
         starting_index = path_components.index('images')
         return '/'.join(path_components[starting_index:])
 
 
 class Labels(db.Model):
+    """
+    Represents a association from a number to a certain label for a trained model
+    """
     __tablename__ = 'labels'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -151,6 +178,9 @@ class ClassificationResults(db.Model):
 
 
 class Result(db.Model):
+    """
+    Represents a classification result from a single face inside an image.
+    """
     __tablename__ = 'result'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -175,4 +205,8 @@ class Result(db.Model):
 
     @hybrid_property
     def bounding_box(self):
+        """
+        Converts a list with bounding box coordinates to single values for db storage and back
+        :return: 
+        """
         return [self.x, self.y, self.w, self.h]

@@ -29,6 +29,10 @@ config = app.config
 
 
 def sync_db_from_filesystem():
+    """
+    Resynchronizes the filesystem with the database. CAUTION: All galleries and images in the database are deleted!
+    :return: 
+    """
     clear_files_from_db()
     # start with new and unknown images
     create_and_populate_gallery(config['IMAGE_BASE_PATH'], 'new', False)
@@ -44,6 +48,13 @@ def sync_db_from_filesystem():
 
 
 def create_and_populate_gallery(base_path, gallery_name, subject_gallery=True):
+    """
+    create a gallery and the images in the gallery folder in the database
+    :param base_path: the filesystem path for the gallery
+    :param gallery_name: the name for the gallery
+    :param subject_gallery: indicates the gallery contains images from a single person (True) or not (False)
+    :return: 
+    """
     gallery_path = os.path.join(base_path, gallery_name)
 
     if subject_gallery:
@@ -62,6 +73,12 @@ def create_and_populate_gallery(base_path, gallery_name, subject_gallery=True):
 
 
 def new_image(image, filename):
+    """
+    create a new image on the filesystem and database
+    :param image: the image as base64 encoded string
+    :param filename: the filename
+    :return: the image id 
+    """
     path = os.path.join(config['NEW_IMAGES_PATH'], filename)
     new_gallery = Gallery.query.filter_by(name='new').first()
 
@@ -75,12 +92,21 @@ def new_image(image, filename):
 
 
 def clear_files_from_db():
+    """
+    clear images and galleries from the database, only for a resync
+    :return: 
+    """
     clear_table(Image)
     clear_table(Gallery)
     db.session.commit()
 
 
 def clear_table(model):
+    """
+    clear the given model table
+    :param model: the model to clear
+    :return: 
+    """
     db.session.query(model).delete()
 
 
@@ -100,6 +126,12 @@ def delete_gallery(src_gallery, dest_gallery):
 
 
 def move_gallery_content(src_gallery, dest_gallery):
+    """
+    move images from one gallery to another
+    :param src_gallery: source gallery
+    :param dest_gallery: destination gallery
+    :return: 
+    """
     basedir = config['BASEDIR']
     src_path = os.path.join(basedir, src_gallery.path)
     dest_path = os.path.join(basedir, dest_gallery.path)
@@ -206,6 +238,10 @@ def chunk_read(response, self, name, chunk_size=1024 * 256, report_hook=None):
 
 
 def models_exist():
+    """
+    Checks if the necessary models for Dlib exist.
+    :return: 
+    """
     models_path = config['ML_MODEL_PATH']
     dlib_shape_predictor = False
     dlib_face_descriptor = False
@@ -219,6 +255,15 @@ def models_exist():
 
 @celery.task(bind=True)
 def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
+    """
+    Trains a new model
+    :param self: the celery instance that runs this task
+    :param clf_type: type of the classifier, "SVM" or "kNN" (untested for the latter)
+    :param n_jobs: number of processes to use for training of the classifier. -1 to use number of cpu cores
+    :param k: only for "kNN", number of nearest neighbors
+    :param cross_val: if cross validation should be performed for the classifier
+    :return: 
+    """
     classifier = create_classifier(clf_type, n_jobs, k)
     X, y, folder_names = utils.load_dataset(config['SUBJECTS_BASE_PATH'], grayscale=False)
     avg_images = np.mean(np.unique(y, return_counts=True)[1])
@@ -302,6 +347,14 @@ def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
 
 
 def augment_images(X, y, target, celery_binding):
+    """
+    Augments the images up to a certain number
+    :param X: Images to augment
+    :param y: Corresponding labels
+    :param target: The target number of images
+    :param celery_binding: the celery binding object, for updating the status
+    :return: The augmented images and corresponding labels
+    """
     unq, unq_inv, unq_cnt = np.unique(y, return_inverse=True, return_counts=True)
     unique_class_indices = np.split(np.argsort(unq_inv), np.cumsum(unq_cnt[:-1]))
     y = np.asarray(y)
@@ -329,17 +382,14 @@ def augment_images(X, y, target, celery_binding):
     return target_x, target_y
 
 
-def training_progress_hook(current_image, total_images, training, celery_binding):
-    step = "Generating descriptors..."
-    if training:
-        step = "Training..."
-
-    celery_binding.update_state(state='STARTED',
-                                meta={'current_image': current_image, 'total_images': total_images,
-                                      'step': step})
-
-
 def create_classifier(clf_type="SVM", n_jobs=-1, k=5):
+    """
+    Creates a new classifier from Scikit-Learn.
+    :param clf_type: The classifier type. Either "SVM" or "kNN"
+    :param n_jobs: Number of processes (only used in "kNN"). -1 for number of cpu cores
+    :param k: Number of neighbors for "kNN"
+    :return: The untrained classifier object
+    """
     if n_jobs == -1:
         n_jobs = multiprocessing.cpu_count()
 
@@ -352,10 +402,21 @@ def create_classifier(clf_type="SVM", n_jobs=-1, k=5):
 
 
 def load_classifier(path):
+    """
+    Load and deserialize a trained classifier from the filesystem
+    :param path: The filepath
+    :return: The deserialized classifier
+    """
     return joblib.load(path)
 
 
 def save_classifier(classifier, path):
+    """
+    serialize and save a trained classifier to the filesystem
+    :param classifier: the classifier to save
+    :param path: the filepath
+    :return: 
+    """
     joblib.dump(classifier, path)
 
 
@@ -382,6 +443,14 @@ def grid_search(X, y, classifier, param_grid, n_jobs=-1):
 
 
 def classify(classifier, image, dists=False, neighbors=None):
+    """
+    classify a image on the given classifier
+    :param classifier: a Scikit-Learn classifier with the predict_proba method available.
+    :param image: The image to be classified
+    :param dists: For "kNN" as classifier, if a distance is given, return absolute distances to number of neighbors
+    :param neighbors: For "kNN" as classifier, the number of neighbors for which a distance should be returned
+    :return: Returns the probabilities or distances for each persons for each face found in the image
+    """
     descriptors, bbs = recognizer.extract_descriptors(image)
 
     results = []
@@ -398,6 +467,12 @@ def classify(classifier, image, dists=False, neighbors=None):
 
 
 def annotate_live_image(image, classification_result):
+    """
+    annotates an image with bounding boxes, names and probabilities from the classification result
+    :param image: the image to annotate encoded as base64.
+    :param classification_result: a classification result with one or multiple faces. 
+    :return: a base64 encoded image with annotations
+    """
     image = base64.b64decode(image)
     image = np.fromstring(image, dtype=np.uint8)
     image = cv2.imdecode(image, cv2.IMREAD_COLOR)
@@ -420,6 +495,11 @@ def annotate_live_image(image, classification_result):
 
 @app.context_processor
 def annotate_processor():
+    """
+    create context processors for use in jinja2 templates
+    :return: 
+    """
+
     def annotate_db_image(classification_result):
         image = cv2.imread(os.path.join(config['BASEDIR'], classification_result.image.path))
 

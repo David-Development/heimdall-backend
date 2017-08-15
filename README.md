@@ -84,17 +84,19 @@ redis available under `0.0.0.0:6379`
 ## Usage
 Create desired folder structure under "app/images/subjects/" folder. Insert images and call `/api/resync` to populate 
 the database. Alternatively create the galleries in the Webinterface. New images can be posted to `/api/live`. 
-For more details look at "app/resources.py" where all API-Endpoints are defined. In the Webinterface are following 
+For more details look at "app/resources.py" where all API-Endpoints are defined. In "camerahandler.py" is an example
+script for receiving images via a socket and sending it to the API.   
+In the Webinterface are following 
 pages:  
 - Galleries: Create and delete galleries. Organize images in galleries.
 - Liveview: Show images as soon as they get processed. Empty on refresh
-- Recent Classifications: Shows the recent classifications and gives possibility to confirm or correct the made decision. 
-- Model Information: Shows information about the learned models. A new training process can be started from here.
+- Recent Classifications: Shows the recent classifications and gives possibility to confirm or correct the classifications. 
+- Model Information: Shows information about the trained models. A new training process can be started from here.
 
 The prototype classifies persons as "unknown" as soon as the maximum probability from the classifier is below a configurable threshold.
 
 ## TODO
 This application is only a prototype and lacks security features, a useful architecture, usability, design and a 
-thorough documentation. As such, the "only" todo is to rewrite the prototype as a full fledged applications. 
+thorough documentation. As such, the "only" todo is to rewrite the prototype as a full fledged application.
             
     

@@ -1,6 +1,5 @@
 import socket
 import sys
-import time
 import base64
 from thread import *
 import requests

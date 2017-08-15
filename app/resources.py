@@ -1,13 +1,12 @@
 import os
 import glob
 import datetime
-import time
 
 from flask_restful import Resource, reqparse, marshal_with, fields, abort
 from sqlalchemy.exc import IntegrityError
 from flask import jsonify, send_from_directory, request, url_for, render_template, json
 import numpy as np
-from flask_socketio import send, emit
+from flask_socketio import send
 from celery.signals import task_prerun, task_postrun
 import requests
 
@@ -258,6 +257,11 @@ def show_images(filename):
 
 @app.route("/api/dlib_models/", methods=['GET', 'POST'])
 def check_models():
+    """
+    Checks and downloads dlib_models. As of now the application expects the model files to exist on startup,
+    so this method is useless for now...
+    :return: 
+    """
     # Check if Models exist
     if request.method == 'GET':
         if models_exist():
@@ -355,13 +359,13 @@ def classify_db_image(image_id):
     db.session.flush()
 
     predictions = []
-    # Jedes erkannte Gesicht
+    # For each detected face
     for faces, bb in zip(results, bbs):
-        # Das wahrscheinlichste Ergebnis
+        # Save the highest probability (the result)
         highest = np.argmax(faces)
         prob = np.max(faces)
 
-        # Weniger als Grenzwert wird als unbekannt eingestuft
+        # If the probability is less then the configures threshold, the person is unknown
         if prob < config['PROBABILITY_THRESHOLD']:
             label = 'unknown'
         else:
@@ -373,7 +377,7 @@ def classify_db_image(image_id):
         prediction_result_dict = {'highest': label,
                                   'bounding_box': bb,
                                   'probability': round(prob, 4)}
-        # Alle Wahrscheinlichkeiten
+        # All probabilities
         for idx, prediction in enumerate(faces):
             prediction_dict[app.labels[idx]] = round(prediction, 4)
         prediction_result_dict['probabilities'] = prediction_dict
