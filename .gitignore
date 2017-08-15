@@ -1,8 +1,8 @@
 # Created by .ignore support plugin (hsz.mobi)
 ### Example user template
 
-*.png
-*.JPG
+*images/*/*.png
+*images/*/*.JPG
 migrations/
 *subjects/*/
 !*subjects/unknown

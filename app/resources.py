@@ -178,8 +178,8 @@ class ModelListRes(Resource):
 
 class ModelRes(Resource):
     @marshal_with(model_fields)
-    def get(self, model_id):
-        res = ClassifierStats.query.filter_by(id=model_id).first()
+    def get(self, classifier_id):
+        res = ClassifierStats.query.filter_by(id=classifier_id).first()
         return res, 200
 
 
@@ -187,8 +187,8 @@ api.add_resource(GalleryRes, '/api/gallery/', '/api/gallery/<gallery_id>/')
 api.add_resource(GalleryImagesListRes, '/api/gallery/<gallery_id>/images/')
 api.add_resource(GalleryListRes, '/api/galleries/')
 api.add_resource(ImageListRes, '/api/images/')
-api.add_resource(ModelListRes, '/api/models/')
-api.add_resource(ModelRes, '/api/model/<model_id>/')
+api.add_resource(ModelListRes, '/api/classifier/')
+api.add_resource(ModelRes, '/api/classifier/<classifier_id>/')
 
 
 @app.route("/api/gallery/<gallery_id>/clear", methods=['POST'])

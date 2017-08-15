@@ -1,13 +1,29 @@
 {% extends "layout.html" %}
-{% block title %}{{title}}{% endblock %}
+{% block title %}{{ title }}{% endblock %}
 {% block head %}
-  {{ super() }}
+    {{ super() }}
 {% endblock %}
-{% block page %}{{title}}{% endblock %}
+{% block page %}{{ title }}{% endblock %}
 {% block heading %}
-  {{ super() }}
+    {{ super() }}
 {% endblock %}
 {% block content %}
-  <h3> This is the start of my child template</h3>
+    <div class="container">
+        <h3>About this Prototype</h3>
+        <p>
+            This Prototype was implemented as Proof of Concept for the Masterthesis titled "Neuronale Netze und andere
+            Verfahren zur Gesichtserkennung in der Heimautomatisierung" by Constantin Kirsch. It is based on the
+            findings of a comparison of different Face Recognition Methods and can be used in a SmartHome environment.
+            This means the server needs only local network access, only a few images for each person are needed and
+            training takes place in a few minutes. For more information, please take a look at the sourcecode
+            repository.
+        </p>
+        <p class="text-center">
+            <img src="{{ url_for('static', filename='media/machine_learning.png') }}"
+                 class="img-responsive center-block"
+                 title="The pile gets soaked with data and starts to get mushy over time, so it's technically recurrent.">
+            Image by <a href="https://xkcd.com/1838/">xkcd</a>. Licensed under CC BY-NC 2.5.
+        </p>
+    </div>
 
 {% endblock %}

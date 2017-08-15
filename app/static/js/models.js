@@ -49,7 +49,7 @@
     $('#plotModal').on('show.bs.modal', function (event) {
         var button = $(event.relatedTarget); // Button that triggered the modal
         var model_id = button.data('id'); // Extract info from data-* attributes
-        var url = '/api/model/' + model_id;
+        var url = '/api/classifier/' + model_id;
         var modal = $(this);
         var labels = [];
         $.getJSON(url, function (data) {
