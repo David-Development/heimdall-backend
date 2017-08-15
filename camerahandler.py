@@ -32,7 +32,6 @@ print 'Socket now listening'
 
 # Function for handling connections. This will be used to create threads
 def clientthread(conn):
-    filename = "images/" + str(time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())) + '.jpg'
     image = ''
     while True:
         # Receiving from client

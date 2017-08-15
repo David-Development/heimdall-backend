@@ -54,8 +54,8 @@
         var labels = [];
         $.getJSON(url, function (data) {
 
-            $.each(data.labels, function(idx, lbl){
-               labels.push(lbl.num + ": " + lbl.label);
+            $.each(data.labels, function (idx, lbl) {
+                labels.push(lbl.num + ": " + lbl.label);
             });
 
             modal.find('#confusion_plot').attr('src', data.confusion_url);
