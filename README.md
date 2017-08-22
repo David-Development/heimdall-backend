@@ -1,7 +1,14 @@
 # Heimdall 
 Face recognition prototype with webinterface. Created for the Masterthesis "Neuronale Netze und andere Verfahren zur 
 Gesichtserkennung im Heimautomatisierungsfumeld" by Constantin Kirsch for the Master of Science in Computer Science at 
-the Bonn-Rhine-Sieg University. Created at the [Multimedia Communication Laboratory](http://mc-lab.inf.h-brs.de/).  
+the Bonn-Rhine-Sieg University. Created at the [Multimedia Communication Laboratory](http://mc-lab.inf.h-brs.de/). 
+It uses the powerful face recognition model from the [Dlib](https://github.com/davisking/dlib)-library by Davis King, 
+as well as the Histogram of Oriented Gradients face detection model. Classification is done with a SVM classifier from 
+[Scikit-Learn](http://scikit-learn.org/). The face detection, feature extraction and training is embedded into a 
+[Flask](http://flask.pocoo.org/) based Webapplication. The whole application is considered as a prototype for 
+experimentation. More Information can be found in the thesis itself or a technical report as soon as they are available
+(Finished writing and made public).
+
   
  
 ## Installation
@@ -69,6 +76,15 @@ redis available under `0.0.0.0:6379`
 - Copy `default_config_template.py` to `default_config.py`
 - Adjust values inside `default_config.py`
 
+##### Download Models
+```bash
+cd ~/app/ml_models
+wget https://github.com/davisking/dlib-models/raw/master/dlib_face_recognition_resnet_model_v1.dat.bz2
+wget https://github.com/davisking/dlib-models/raw/master/shape_predictor_68_face_landmarks.dat.bz2
+bunzip2 dlib_face_recognition_resnet_model_v1.dat.bz2
+bunzip2 shape_predictor_68_face_landmarks.dat.bz2
+```
+
 ##### Initialize Database
 `python manage.py db init`  
 `python manage.py db migrate`  
@@ -84,10 +100,9 @@ redis available under `0.0.0.0:6379`
 ## Usage
 Create desired folder structure under "app/images/subjects/" folder. Insert images and call `/api/resync` to populate 
 the database. Alternatively create the galleries in the Webinterface. New images can be posted to `/api/live`. 
-For more details look at "app/resources.py" where all API-Endpoints are defined. In "camerahandler.py" is an example
-script for receiving images via a socket and sending it to the API.   
-In the Webinterface are following 
-pages:  
+For more details look at "app/resources.py" where all API-Endpoints are defined. An example for receiving images
+via a socket and sendint it to the API is included in `camerahandler.py`.
+The webinterface consists of the following pages:
 - Galleries: Create and delete galleries. Organize images in galleries.
 - Liveview: Show images as soon as they get processed. Empty on refresh
 - Recent Classifications: Shows the recent classifications and gives possibility to confirm or correct the classifications. 
@@ -97,6 +112,6 @@ The prototype classifies persons as "unknown" as soon as the maximum probability
 
 ## TODO
 This application is only a prototype and lacks security features, a useful architecture, usability, design and a 
-thorough documentation. As such, the "only" todo is to rewrite the prototype as a full fledged application.
+thorough documentation. As such, the "only" todo is to rewrite the prototype as a full fledged application. 
             
     
