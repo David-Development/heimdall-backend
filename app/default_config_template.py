@@ -5,9 +5,6 @@ BASEDIR = os.path.abspath(os.path.dirname(__file__))
 
 SERVER_NAME = '<ip/hostname>:<port>'
 
-CAMERA_SOCKET_HOST = '<host>'
-CAMERA_SOCKET_PORT = 8001
-
 SQLALCHEMY_DATABASE_URI = 'postgresql://<db_user>:<password>@<host>/<db_name>'
 SQLALCHEMY_TRACK_MODIFICATIONS = False
 

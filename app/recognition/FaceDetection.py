@@ -1,6 +1,5 @@
 import cv2
 import dlib
-import utils
 import os
 
 
