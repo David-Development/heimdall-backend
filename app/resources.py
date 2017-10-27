@@ -29,6 +29,9 @@ live_parser = reqparse.RequestParser()
 live_parser.add_argument('image')
 live_parser.add_argument('annotate')
 
+image_upload_parser = reqparse.RequestParser()
+image_upload_parser.add_argument('image')
+
 gallery_fields = {
     'id': fields.Integer,
     'name': fields.String,
@@ -315,6 +318,15 @@ def training_recognizer():
     return jsonify({'message': 'Training started', 'location': task_url}), 202, {'Location': task_url}
 
 
+@app.route("/api/image/upload/", methods=['POST'])
+def upload_image():
+    parsed_args = image_upload_parser.parse_args()
+    image = parsed_args['image']
+    filename = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')[:-3]) + '.jpg'
+    id = new_image(image, filename)
+    return jsonify({'message': 'Image uploaded'}), 200
+
+
 @app.route("/api/live/", methods=['POST'])
 def new_live_image():
     """
@@ -331,16 +343,19 @@ def new_live_image():
             annotate = False
     filename = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')[:-3]) + '.jpg'
     id = new_image(image, filename)
-    with app.app_context():
-        url = url_for('classify_db_image', image_id=id, _external=True)
-    r = requests.get(url)
-    result = r.json()
-    if len(result['predictions']) > 0 and annotate:
-        image = annotate_live_image(image, result)
 
-    socketio.emit('new_image', json.dumps({'image': image,
-                                           'image_id': id,
-                                           'classification': result}))
+    latest_clf = ClassifierStats.query.order_by(ClassifierStats.date.desc()).first()
+    if latest_clf:
+        with app.app_context():
+            url = url_for('classify_db_image', image_id=id, _external=True)
+        r = requests.get(url)
+        result = r.json()
+        if len(result['predictions']) > 0 and annotate:
+            image = annotate_live_image(image, result)
+
+        socketio.emit('new_image', json.dumps({'image': image,
+                                            'image_id': id,
+                                            'classification': result}))
 
     return jsonify({'message': 'Image processed'}), 200
 
@@ -406,10 +421,21 @@ def recognizer_training_status(task_id):
 
     return jsonify(response)
 
+#def fullname(o):
+#  return o.__module__ + "." + o.__class__.__name__
 
 def get_recognizer_training_status(task_id):
     task = train_recognizer.AsyncResult(task_id)
+
+    #print fullname(task.info)
+
     if task.info is None:
+        response = {
+            'state': task.state
+        }
+    elif task.state == "FAILURE":
+    #elif isinstance(task.info, celery.backends.base.WorkerLostError):
+        print "celery.backends.base.WorkerLostError"
         response = {
             'state': task.state
         }
