@@ -3,15 +3,15 @@ import os
 
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
 
-SERVER_NAME = '<ip/hostname>:<port>'
+#SERVER_NAME = '0.0.0.0:5000'
 
-SQLALCHEMY_DATABASE_URI = 'postgresql://<db_user>:<password>@<host>/<db_name>'
+SQLALCHEMY_DATABASE_URI = 'postgresql://heimdall:heimdall@postgres/heimdall'
 SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-REDIS_HOST = '<host>'
-REDIS_PORT = '<port>'
-CELERY_BROKER_URL = 'redis://<host>:<port>/0'
-CELERY_RESULT_BACKEND = 'redis://<host>:<port>/0'
+REDIS_HOST = 'redis'
+REDIS_PORT = '6379'
+CELERY_BROKER_URL = 'redis://redis:6379/0'
+CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
 CELERYD_MAX_TASKS_PER_CHILD = 1
 
 IMAGE_FOLDER = 'images'
