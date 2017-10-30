@@ -17,7 +17,7 @@ class Augmenter:
         images = np.asarray(images)
         # check for color images, shape is expected to be (n_images, width, height, n_channel)
         # if last dim is missing, its grayscale, for keras a dummy dimension is added
-        print images.shape
+        print(images.shape)
         if images.ndim is 3:
             color = False
             images = np.asarray(images)[:, :, :, np.newaxis]

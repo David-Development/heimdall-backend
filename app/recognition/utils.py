@@ -18,12 +18,13 @@ def load_dataset(path, grayscale=True, pil=False):
             if len(os.listdir(subject_path)) > 0:
                 folder_names.append(subdirname)
                 for filename in os.listdir(subject_path):
-                    if not filename.endswith('.md') and os.path.isfile(os.path.join(subject_path, filename)):
+                    if not filename.endswith('.md') and not filename.endswith('.DS_Store') and os.path.isfile(os.path.join(subject_path, filename)):
                         if pil:
                             im = Image.open(os.path.join(subject_path, filename))
                             if grayscale:
                                 im = im.convert("L")
                         else:
+                            print("Path: " + os.path.join(subject_path, filename))
                             im = cv2.imread(os.path.join(subject_path, filename))
                             if grayscale:
                                 im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
@@ -125,4 +126,4 @@ def to_vector_list(X):
 
 
 def create_label_dict(y, labels):
-    return dict(zip(list(xrange(max(y) + 1)), labels))
+    return dict(zip(list(range(max(y) + 1)), labels))

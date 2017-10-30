@@ -10,10 +10,10 @@ from flask_socketio import send
 from celery.signals import task_prerun, task_postrun
 import requests
 
-from models import Gallery, Image, ClassifierStats, ClassificationResults, Result
+from .models import Gallery, Image, ClassifierStats, ClassificationResults, Result
 from app import api, app, db, recognizer, clf, labels, socketio, celery, r
-from recognition import utils
-from tasks import (sync_db_from_filesystem, delete_gallery, move_images, download_models, models_exist,
+from .recognition import utils
+from .tasks import (sync_db_from_filesystem, delete_gallery, move_images, download_models, models_exist,
                    train_recognizer, load_classifier, classify, new_image, annotate_live_image, clear_gallery)
 
 config = app.config
@@ -233,12 +233,14 @@ def task_overview():
     tasks = {}
     for key in r.keys():
         content = r.hgetall(key)
+        task_id = content['task_id']
         if key == 'app.tasks.train_recognizer':
-            content['task_url'] = url_for('recognizer_training_status', task_id=content['task_id'])
+            content['task_url'] = url_for('recognizer_training_status', task_id=task_id)
         tasks[key] = content
-        content['details'] = get_recognizer_training_status(content['task_id'])
+        content['details'] = get_recognizer_training_status(task_id)
 
     return jsonify(tasks), 201
+
 
 
 @app.route("/models")
@@ -346,14 +348,16 @@ def new_live_image():
 
     latest_clf = ClassifierStats.query.order_by(ClassifierStats.date.desc()).first()
     if latest_clf:
-        with app.app_context():
-            #url = url_for('classify_db_image', image_id=id, _external=True)
-            # TODO find better way to call this method below!
-            url = "http://heimdall:5000/api/recognizer/classify/" + str(id)
-        r = requests.get(url)
-        result = r.json()
+        result = classify_db_image(id)
+
+        #with app.app_context():
+        #    url = url_for('classify_db_image', image_id=id, _external=True)
+        #r = requests.get(url)
+        #result = r.json()
         if len(result['predictions']) > 0 and annotate:
             image = annotate_live_image(image, result)
+
+        print(result)
 
         socketio.emit('new_image', json.dumps({'image': image,
                                             'image_id': id,
@@ -362,7 +366,7 @@ def new_live_image():
     return jsonify({'message': 'Image processed'}), 200
 
 
-@app.route("/api/recognizer/classify/<image_id>")
+#@app.route("/api/recognizer/classify/<image_id>")
 def classify_db_image(image_id):
     db_image = Image.query.filter_by(id=image_id).first()
     image_path = os.path.join(config['BASEDIR'], db_image.path)
@@ -416,9 +420,12 @@ def classify_db_image(image_id):
         timing_file.write(text)
 
 
-    return jsonify({'message': 'classification complete',
+    return {'message': 'classification complete',
                     'predictions': predictions,
-                    'bounding_boxes': bbs})
+                    'bounding_boxes': bbs}
+    #return jsonify({'message': 'classification complete',
+    #                'predictions': predictions,
+    #                'bounding_boxes': bbs})
 
 
 @app.route("/api/recognizer/train/status/<task_id>")

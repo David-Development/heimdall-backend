@@ -11,7 +11,7 @@ from flask_sqlalchemy import SQLAlchemy
 from celery import Celery
 import redis
 
-from recognition import Recognizer
+from .recognition.Recognition import Recognizer
 
 logging.getLogger('socketio').setLevel(logging.ERROR)
 logging.getLogger('engineio').setLevel(logging.ERROR)
@@ -21,10 +21,12 @@ eventlet.monkey_patch()
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 app = Flask(__name__)
+app.debug = True
+
 api = Api(app)
 AppConfig(app, os.path.join(basedir, 'default_config.py'))
 db = SQLAlchemy(app)
-r = redis.StrictRedis(host=app.config['REDIS_HOST'], port=app.config['REDIS_PORT'], db=1)
+r = redis.StrictRedis(host=app.config['REDIS_HOST'], port=app.config['REDIS_PORT'], db=1, charset="utf-8", decode_responses=True)
 
 # turn the flask app into a socketio app
 socketio = SocketIO()
@@ -37,7 +39,9 @@ celery.conf.update(app.config)
 
 clf = None
 labels = {}
-from app import models, resources
+
+# This import needs to come after we initialized the database
+from . import models, resources
 
 
 def create_app(main=True):
@@ -73,7 +77,7 @@ def init_models():
     # Check for dlib models and download if necessary
     resources.check_models()
 
-    from tasks import create_classifier, load_classifier
+    from .tasks import create_classifier, load_classifier
 
     db_model = models.ClassifierStats.query.filter_by(loaded=True).first()
     

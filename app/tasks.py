@@ -1,6 +1,6 @@
 import os
 import shutil
-import urllib2
+from urllib.request import urlopen
 import bz2
 import time
 import datetime
@@ -14,16 +14,16 @@ from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import GridSearchCV, cross_val_score
 from sklearn.externals import joblib
-from scikitplot import plotters as skplt
-from scikitplot import classifier_factory
-import matplotlib.pyplot as plt
+#from scikitplot import plotters as skplt
+#from scikitplot import classifier_factory
+#import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 
 from app import db, app, celery, recognizer, socketio, clf
-from models import Gallery, Image, ClassifierStats, Labels, ClassificationResults
+from .models import Gallery, Image, ClassifierStats, Labels, ClassificationResults
 
-from recognition import utils, augmenter
+from .recognition import utils, augmenter
 
 config = app.config
 
@@ -183,8 +183,8 @@ def download_models(self):
 
     path_dlib_shape_predictor_model  = os.path.join(config['ML_MODEL_PATH'], config['DLIB_SHAPE_PREDICTOR_MODEL'])
     path_dlib_face_recognition_model = os.path.join(config['ML_MODEL_PATH'], config['DLIB_FACE_RECOGNITION_MODEL'])
-    print "Download: " + config['DLIB_SHAPE_PREDICTOR_MODEL_URL'] + " to " + path_dlib_shape_predictor_model
-    print "Download: " + config['DLIB_FACE_RECOGNITION_MODEL']    + " to " + path_dlib_face_recognition_model
+    print("Download: " + config['DLIB_SHAPE_PREDICTOR_MODEL_URL'] + " to " + path_dlib_shape_predictor_model)
+    print("Download: " + config['DLIB_FACE_RECOGNITION_MODEL']    + " to " + path_dlib_face_recognition_model)
 
     if not os.path.isfile(path_dlib_shape_predictor_model):
         self.update_state(state='STARTED', meta={'current': 1, 'total': 2, 'status': 'Downloading Dlib Shape Predictor'})
@@ -341,7 +341,7 @@ def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
     # flush to generate stats id
     db.session.flush()
 
-    for key, value in label_dict.iteritems():
+    for key, value in label_dict.items():
         label_entry = Labels(clf_id=stats.id, num=key, label=value)
         db.session.add(label_entry)
 
@@ -349,9 +349,9 @@ def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
     save_classifier(classifier, path)
 
     with app.app_context():
-        #url = url_for('load_new_classifier', _external=True)
-        # TODO find better way to call this method below!
-        url = "http://heimdall:5000/api/classifier/load/"
+        url = url_for('load_new_classifier', _external=True)
+        if config['HEIMDALL_DOCKER_BACKEND']:
+            url = url.replace(config['SERVER_NAME'], config['HEIMDALL_DOCKER_BACKEND'])
     requests.post(url)
 
     del X, y, transformed
@@ -382,7 +382,7 @@ def augment_images(X, y, target, celery_binding):
         tmp_x = []
         tmp_y = []
         celery_binding.update_state(state='STARTED',
-                                    meta={'current': unique_class + 1, 'total': len(unique_class_indices),
+                                    meta={'current': int(unique_class + 1), 'total': len(unique_class_indices),
                                           'step': 'Augmenting'})
         # Augment until target-len(indices) are generated
         # Keras can't augment more images than it has received, so the process needs to be done multiple
@@ -505,7 +505,9 @@ def annotate_live_image(image, classification_result):
         image = cv2.putText(image, text, (bb[0], bb[1] + bb[3] + 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, color, thickness=2)
 
-    return base64.b64encode(cv2.imencode('.jpg', image)[1])
+    #return base64.b64encode(cv2.imencode('.jpg', image)[1])
+    b64bytes = base64.b64encode(cv2.imencode('.jpg', image)[1])
+    return b64bytes.decode("utf-8")
 
 
 @app.context_processor
@@ -534,6 +536,8 @@ def annotate_processor():
             image = cv2.putText(image, text, (bb[0], bb[1] + bb[3] + 30),
                                 cv2.FONT_HERSHEY_SIMPLEX, 1, color, thickness=2)
 
-        return base64.b64encode(cv2.imencode('.jpg', image)[1])
+        #return base64.b64encode(cv2.imencode('.jpg', image)[1])
+        b64bytes = base64.b64encode(cv2.imencode('.jpg', image)[1])
+        return b64bytes.decode("utf-8")
 
     return dict(annotate_db_image=annotate_db_image)
