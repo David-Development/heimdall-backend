@@ -114,4 +114,12 @@ The prototype classifies persons as "unknown" as soon as the maximum probability
 This application is only a prototype and lacks security features, a useful architecture, usability, design and a 
 thorough documentation. As such, the "only" todo is to rewrite the prototype as a full fledged application. 
             
-    
+
+
+
+# Login to pgstudio:
+
+- host: postgres
+- port: 5432
+- user: heimdall
+- pass: heimdall

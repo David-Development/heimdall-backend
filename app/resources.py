@@ -347,7 +347,9 @@ def new_live_image():
     latest_clf = ClassifierStats.query.order_by(ClassifierStats.date.desc()).first()
     if latest_clf:
         with app.app_context():
-            url = url_for('classify_db_image', image_id=id, _external=True)
+            #url = url_for('classify_db_image', image_id=id, _external=True)
+            # TODO find better way to call this method below!
+            url = "http://heimdall:5000/api/recognizer/classify/" + str(id)
         r = requests.get(url)
         result = r.json()
         if len(result['predictions']) > 0 and annotate:
@@ -366,7 +368,13 @@ def classify_db_image(image_id):
     image_path = os.path.join(config['BASEDIR'], db_image.path)
     image = utils.load_image(image_path)
 
+    time_before_classification = datetime.datetime.now()
+
     results, bbs = classify(app.clf, image)
+
+    time_after_classification = datetime.datetime.now()
+    diff = time_after_classification - time_before_classification
+
     latest_clf = ClassifierStats.query.order_by(ClassifierStats.date.desc()).first()
     classification_result = ClassificationResults(clf_id=latest_clf.id, image_id=db_image.id,
                                                   date=datetime.datetime.now())
@@ -400,6 +408,13 @@ def classify_db_image(image_id):
         predictions.append(prediction_result_dict)
 
         db.session.commit()
+
+
+    with open("timings.txt", "a") as timing_file:
+        text = str(datetime.datetime.now()) + " - Time needed for classification: " + str(diff) + \
+               " - Faces Count: " + str(len(bbs)) + "\n"
+        timing_file.write(text)
+
 
     return jsonify({'message': 'classification complete',
                     'predictions': predictions,
@@ -435,7 +450,6 @@ def get_recognizer_training_status(task_id):
         }
     elif task.state == "FAILURE":
     #elif isinstance(task.info, celery.backends.base.WorkerLostError):
-        print "celery.backends.base.WorkerLostError"
         response = {
             'state': task.state
         }

@@ -70,6 +70,9 @@ def init_models():
     # Resync database on startup
     resources.resync_db()
 
+    # Check for dlib models and download if necessary
+    resources.check_models()
+
     from tasks import create_classifier, load_classifier
 
     db_model = models.ClassifierStats.query.filter_by(loaded=True).first()
@@ -82,8 +85,9 @@ def init_models():
             latest_model = max(modelList, key=os.path.getctime)
             app.clf = load_classifier(latest_model)
             db_model = models.ClassifierStats.query.order_by(models.ClassifierStats.date.desc()).first()
-            app.labels = db_model.labels_as_dict()
-            db_model.loaded = True
+            if db_model: # todo pre-compiled pkl files won't be recognized here on first startup...
+                app.labels = db_model.labels_as_dict()
+                db_model.loaded = True
             db.session.commit()
     else:
         app.clf = load_classifier(db_model.model_path)

@@ -3,7 +3,7 @@ import os
 
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
 
-#SERVER_NAME = '0.0.0.0:5000'
+#SERVER_NAME = 'localhost:5000'
 
 SQLALCHEMY_DATABASE_URI = 'postgresql://heimdall:heimdall@postgres/heimdall'
 SQLALCHEMY_TRACK_MODIFICATIONS = False

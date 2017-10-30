@@ -96,6 +96,7 @@ def clear_files_from_db():
     clear images and galleries from the database, only for a resync
     :return: 
     """
+    clear_table(ClassificationResults)
     clear_table(Image)
     clear_table(Gallery)
     db.session.commit()
@@ -180,27 +181,34 @@ def download_models(self):
     :return: 
     """
 
-    self.update_state(state='STARTED', meta={'current': 1, 'total': 2, 'status': 'Downloading Dlib Shape Predictor'})
-    print config['DLIB_SHAPE_PREDICTOR_MODEL_URL']
-    response = urllib2.urlopen(config['DLIB_SHAPE_PREDICTOR_MODEL_URL'])
-    model = chunk_read(response, self, name="Dlib Shape Predictor", report_hook=chunk_report)
+    path_dlib_shape_predictor_model  = os.path.join(config['ML_MODEL_PATH'], config['DLIB_SHAPE_PREDICTOR_MODEL'])
+    path_dlib_face_recognition_model = os.path.join(config['ML_MODEL_PATH'], config['DLIB_FACE_RECOGNITION_MODEL'])
+    print "Download: " + config['DLIB_SHAPE_PREDICTOR_MODEL_URL'] + " to " + path_dlib_shape_predictor_model
+    print "Download: " + config['DLIB_FACE_RECOGNITION_MODEL']    + " to " + path_dlib_face_recognition_model
 
-    with open(os.path.join(config['ML_MODEL_PATH'], config['DLIB_SHAPE_PREDICTOR_MODEL']), 'w') as f:
+    if not os.path.isfile(path_dlib_shape_predictor_model):
+        self.update_state(state='STARTED', meta={'current': 1, 'total': 2, 'status': 'Downloading Dlib Shape Predictor'})
+
+        response = urllib2.urlopen(config['DLIB_SHAPE_PREDICTOR_MODEL_URL'])
+        model = chunk_read(response, self, name="Dlib Shape Predictor", report_hook=chunk_report)
+
+        with open(path_dlib_shape_predictor_model, 'w') as f:
+            self.update_state(state='STARTED',
+                              meta={'current': 1, 'total': 2, 'status': 'Unpacking Dlib Shape Predictor'})
+            model = bz2.decompress(model)
+            f.write(model)
+
+    if not os.path.isfile(path_dlib_face_recognition_model):
         self.update_state(state='STARTED',
-                          meta={'current': 1, 'total': 2, 'status': 'Unpacking Dlib Shape Predictor'})
-        model = bz2.decompress(model)
-        f.write(model)
+                          meta={'current': 2, 'total': 2, 'status': 'Downloading Dlib Face Descriptor Model'})
+        response = urllib2.urlopen(config['DLIB_FACE_RECOGNITION_MODEL_URL'])
+        model = chunk_read(response, self, name="Dlib Face Descriptor Model", report_hook=chunk_report)
 
-    self.update_state(state='STARTED',
-                      meta={'current': 2, 'total': 2, 'status': 'Downloading Dlib Face Descriptor Model'})
-    response = urllib2.urlopen(config['DLIB_FACE_RECOGNITION_MODEL_URL'])
-    model = chunk_read(response, self, name="Dlib Face Descriptor Model", report_hook=chunk_report)
-
-    with open(os.path.join(config['ML_MODEL_PATH'], config['DLIB_FACE_RECOGNITION_MODEL']), 'w') as f:
-        self.update_state(state='STARTED',
-                          meta={'current': 2, 'total': 2, 'status': 'Unpacking Dlib Face Descriptor Model'})
-        model = bz2.decompress(model)
-        f.write(model)
+        with open(path_dlib_face_recognition_model, 'w') as f:
+            self.update_state(state='STARTED',
+                              meta={'current': 2, 'total': 2, 'status': 'Unpacking Dlib Face Descriptor Model'})
+            model = bz2.decompress(model)
+            f.write(model)
 
     return {'current': 2, 'total': 2, 'status': 'Task completed!', 'result': 'Models downloaded'}
 
@@ -310,14 +318,19 @@ def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
     full_filename = filename + '.pkl'
     path = os.path.join(config['ML_MODEL_PATH'], full_filename)
 
-    preds = classifier.predict(transformed)
-    skplt.plot_confusion_matrix(y_true=labels, y_pred=preds)
-    confusion_path = os.path.join(config['PLOTS_BASE_PATH'], filename + '_confusion.png')
-    plt.savefig(confusion_path, bbox_inches='tight')
+    plot_stats = False
+    confusion_path = ""
+    learning_curve_path = ""
 
-    skplt.plot_learning_curve(classifier, transformed, labels)
-    learning_curve_path = os.path.join(config['PLOTS_BASE_PATH'], filename + '_learning.png')
-    plt.savefig(learning_curve_path, bbox_inches='tight')
+    if plot_stats:
+        preds = classifier.predict(transformed)
+        skplt.plot_confusion_matrix(y_true=labels, y_pred=preds)
+        confusion_path = os.path.join(config['PLOTS_BASE_PATH'], filename + '_confusion.png')
+        plt.savefig(confusion_path, bbox_inches='tight')
+
+        skplt.plot_learning_curve(classifier, transformed, labels)
+        learning_curve_path = os.path.join(config['PLOTS_BASE_PATH'], filename + '_learning.png')
+        plt.savefig(learning_curve_path, bbox_inches='tight')
 
     stats = ClassifierStats(name=clf_type + timestamp, classifier_type=clf_type, model_path=path,
                             date=datetime.datetime.now(), cv_score=cv_score, total_images=total_images,
@@ -336,7 +349,9 @@ def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
     save_classifier(classifier, path)
 
     with app.app_context():
-        url = url_for('load_new_classifier', _external=True)
+        #url = url_for('load_new_classifier', _external=True)
+        # TODO find better way to call this method below!
+        url = "http://heimdall:5000/api/classifier/load/"
     requests.post(url)
 
     del X, y, transformed
