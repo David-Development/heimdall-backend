@@ -71,15 +71,17 @@ def init_models():
     from tasks import create_classifier, load_classifier
 
     db_model = models.ClassifierStats.query.filter_by(loaded=True).first()
-    app.clf = load_classifier(db_model.model_path)
-    app.labels = db_model.labels_as_dict()
 
     if db_model is None:
         app.clf = create_classifier()
         path = app.config['ML_MODEL_PATH'] + os.sep + '*.pkl'
         latest_model = max(glob.glob(path), key=os.path.getctime)
-        app.clf = load_classifier(latest_model)
-        db_model = models.ClassifierStats.query.order_by(models.ClassifierStats.date.desc()).first()
+        if latest_model:
+            app.clf = load_classifier(latest_model)
+            db_model = models.ClassifierStats.query.order_by(models.ClassifierStats.date.desc()).first()
+            app.labels = db_model.labels_as_dict()
+            db_model.loaded = True
+            db.session.commit()
+    else:
+        app.clf = load_classifier(db_model.model_path)
         app.labels = db_model.labels_as_dict()
-        db_model.loaded = True
-        db.session.commit()
