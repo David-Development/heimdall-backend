@@ -37,8 +37,10 @@ else
 fi
 
 
-echo "start celery..."
-celery worker --detach -A celery_worker.celery --loglevel=DEBUG --logfile celeryd.log
+#echo "start celery..."
+#celery worker --detach -A celery_worker.celery --loglevel=DEBUG --logfile celeryd.log
 
 echo "run..."
 $python manage.py run
+
+#$python test.py

@@ -13,10 +13,17 @@ import redis
 
 from .recognition.Recognition import Recognizer
 
+
+
+
+
+
+
+
 logging.getLogger('socketio').setLevel(logging.ERROR)
 logging.getLogger('engineio').setLevel(logging.ERROR)
 
-eventlet.monkey_patch()
+eventlet.monkey_patch() # this removes multithreading options
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 

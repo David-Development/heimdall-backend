@@ -14,16 +14,16 @@ from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import GridSearchCV, cross_val_score
 from sklearn.externals import joblib
-#from scikitplot import plotters as skplt
-#from scikitplot import classifier_factory
-#import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 
-from app import db, app, celery, recognizer, socketio, clf
+from app import db, app, celery, recognizer, socketio, clf, r
 from .models import Gallery, Image, ClassifierStats, Labels, ClassificationResults
 
 from .recognition import utils, augmenter
+
+import scikitplot
+import matplotlib.pyplot as plt
 
 config = app.config
 
@@ -261,140 +261,200 @@ def models_exist():
     return dlib_shape_predictor and dlib_face_descriptor
 
 
-@celery.task(bind=True)
-def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
-    """
-    Trains a new model
-    :param self: the celery instance that runs this task
-    :param clf_type: type of the classifier, "SVM" or "kNN" (untested for the latter)
-    :param n_jobs: number of processes to use for training of the classifier. -1 to use number of cpu cores
-    :param k: only for "kNN", number of nearest neighbors
-    :param cross_val: if cross validation should be performed for the classifier
-    :return: 
-    """
-    classifier = create_classifier(clf_type, n_jobs, k)
-    X, y, folder_names = utils.load_dataset(config['SUBJECTS_BASE_PATH'], grayscale=False)
-    avg_images = np.mean(np.unique(y, return_counts=True)[1])
+from multiprocessing import Process
+import random
 
-    start = time.time()
-    X, y = augment_images(X, y, target=config['NUM_TARGET_IMAGES'], celery_binding=self)
-    label_dict = utils.create_label_dict(y, folder_names)
-    total_images = len(y)
-    i = 0
-    no_face = 0
-    cv_score = None
-    transformed = []
-    labels = []
+class TrainRecognizer:
 
-    for data in zip(X, y):
-        image = data[0]
-        label = data[1]
-        i += 1
-        self.update_state(state='STARTED',
-                          meta={'current': i, 'total': total_images,
-                                'step': 'Transforming'})
-        descriptors, _ = recognizer.extract_descriptors(image)
-        if len(descriptors) != 0:
-            for descriptor in descriptors:
-                transformed.append(descriptor)
-                labels.append(label)
-        else:
-            no_face += 1
+    def __init__(self):
+        self.task_id = random.randint(0, 1000000)
+        r.delete("train_recognizer")
 
-    if cross_val:
-        self.update_state(state='STARTED',
-                          meta={'current': total_images, 'total': total_images,
-                                'step': 'Scoring'})
-        cv_score = np.mean(cross_val_score(classifier, transformed, labels, cv=5, n_jobs=n_jobs))
+    def get_status(self):
+        status = r.get("train_recognizer")
+        if status:
+            return json.loads(status)
+        return {}
 
-    self.update_state(state='STARTED',
-                      meta={'current': total_images, 'total': total_images,
-                            'step': 'Training'})
-    classifier.fit(transformed, labels)
+    def run(self):
+        self.update_status('IDLE', {})
 
-    training_time = time.time() - start
-    timestamp = time.strftime('%Y%m%d%H%M%S')
-    filename = clf_type + timestamp
-    full_filename = filename + '.pkl'
-    path = os.path.join(config['ML_MODEL_PATH'], full_filename)
+        p = Process(target=self.train_recognizer)
+        # p = Process(target=self.train_recognizer, args=(taskid,))
+        p.daemon = True
+        p.start()
 
-    plot_stats = False
-    confusion_path = ""
-    learning_curve_path = ""
+        return self.task_id
 
-    if plot_stats:
-        preds = classifier.predict(transformed)
-        skplt.plot_confusion_matrix(y_true=labels, y_pred=preds)
+    def update_status(self, state, meta):
+        content = json.dumps({'task_id': self.task_id, 'status': {'state': state, 'meta': meta}})
+        print("Content:", content)
+        # r.hset("train_recognizer", self.task_id, content)
+        # r.hmset("train_recognizer", content)
+        r.set("train_recognizer", content)
+
+    def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
+        """
+        Trains a new model
+        :param self: the celery instance that runs this task
+        :param taskid: taskid
+        :param clf_type: type of the classifier, "SVM" or "kNN" (untested for the latter)
+        :param n_jobs: number of processes to use for training of the classifier. -1 to use number of cpu cores
+        :param k: only for "kNN", number of nearest neighbors
+        :param cross_val: if cross validation should be performed for the classifier
+        :return:
+        """
+
+        classifier = create_classifier(clf_type, n_jobs, k)
+        X, y, folder_names = utils.load_dataset(config['SUBJECTS_BASE_PATH'], grayscale=False)
+        avg_images = np.mean(np.unique(y, return_counts=True)[1])
+
+        start = time.time()
+        #X, y = self.augment_images(X, y, target=config['NUM_TARGET_IMAGES'])
+        X, y = self.augment_images(X, y, folder_names, target=config['NUM_TARGET_IMAGES'])
+
+        label_dict = utils.create_label_dict(y, folder_names)
+        total_images = len(y)
+        i = 0
+        no_face = 0
+        cv_score = None
+        transformed = []
+        labels = []
+
+        print("_______________________________")
+        print("Num of Pictures:", len(X))
+        print("Num of Labels:", len(y))
+        print("Unique Labels:", np.unique(y))
+        print("Label Dictionary:", label_dict)
+
+        for data in zip(X, y):
+            image = data[0]
+            label = data[1]
+            i += 1
+            self.update_status('STARTED', {'current': i, 'total': total_images, 'step': 'Transforming'})
+            descriptors, _ = recognizer.extract_descriptors(image)
+            if len(descriptors) != 0:
+                for descriptor in descriptors:
+                    transformed.append(descriptor)
+                    labels.append(label)
+
+                #imgOutput = cv2.cvtColor(image, cv2.COLOR_RGB2BGR) # convert colors back
+                #cv2.imwrite("./images_for_debugging/face_" + str(i) + ".jpg", imgOutput)
+            else:
+                print("No face at position:", i)
+                print("Label:", label)
+                no_face += 1
+
+                imgOutput = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)  # convert colors back
+                cv2.imwrite("./images_for_debugging/no_face_" + str(i) + ".jpg", imgOutput)
+
+        if cross_val:
+            self.update_status('STARTED', {'current': total_images, 'total': total_images,'step': 'Scoring'})
+            cv_score = np.mean(cross_val_score(classifier, transformed, labels, cv=5, n_jobs=n_jobs))
+
+            self.update_status('STARTED',{'current': total_images, 'total': total_images,'step': 'Training'})
+        classifier.fit(transformed, labels)
+
+        print("Labels after zip:", np.unique(labels))
+        print("Transformed after (len):", len(transformed))
+        print("Classifier:", classifier)
+        print("No face count:", no_face)
+
+        training_time = time.time() - start
+        timestamp = time.strftime('%Y%m%d%H%M%S')
+        filename = clf_type + timestamp
+        full_filename = filename + '.pkl'
+        path = os.path.join(config['ML_MODEL_PATH'], full_filename)
+
+        predictions = classifier.predict(transformed)
+        scikitplot.metrics.plot_confusion_matrix(y_true=labels, y_pred=predictions)
         confusion_path = os.path.join(config['PLOTS_BASE_PATH'], filename + '_confusion.png')
         plt.savefig(confusion_path, bbox_inches='tight')
 
-        skplt.plot_learning_curve(classifier, transformed, labels)
+        # scikitplot.estimators.plot_learning_curve(classifier, transformed, labels) # TODO this line is not working!
         learning_curve_path = os.path.join(config['PLOTS_BASE_PATH'], filename + '_learning.png')
         plt.savefig(learning_curve_path, bbox_inches='tight')
 
-    stats = ClassifierStats(name=clf_type + timestamp, classifier_type=clf_type, model_path=path,
-                            date=datetime.datetime.now(), cv_score=cv_score, total_images=total_images,
-                            total_no_face=no_face, training_time=training_time, avg_base_img=avg_images,
-                            num_classes=len(folder_names), confusion_matrix=confusion_path,
-                            learning_curve=learning_curve_path)
-    db.session.add(stats)
-    # flush to generate stats id
-    db.session.flush()
+        stats = ClassifierStats(name=clf_type + timestamp, classifier_type=clf_type, model_path=path,
+                                date=datetime.datetime.now(), cv_score=cv_score, total_images=total_images,
+                                total_no_face=no_face, training_time=training_time, avg_base_img=avg_images,
+                                num_classes=len(folder_names), confusion_matrix=confusion_path,
+                                learning_curve=learning_curve_path)
+        db.session.add(stats)
+        # flush to generate stats id
+        db.session.flush()
 
-    for key, value in label_dict.items():
-        label_entry = Labels(clf_id=stats.id, num=key, label=value)
-        db.session.add(label_entry)
+        for key, value in label_dict.items():
+            label_entry = Labels(clf_id=stats.id, num=key, label=value)
+            db.session.add(label_entry)
 
-    db.session.commit()
-    save_classifier(classifier, path)
+        db.session.commit()
+        save_classifier(classifier, path)
 
-    with app.app_context():
-        url = url_for('load_new_classifier', _external=True)
-        if config['HEIMDALL_DOCKER_BACKEND']:
-            url = url.replace(config['SERVER_NAME'], config['HEIMDALL_DOCKER_BACKEND'])
-    requests.post(url)
+        with app.app_context():
+            if config['HEIMDALL_DOCKER_BACKEND']:
+                url = "http://" + config['HEIMDALL_DOCKER_BACKEND'] + "/api/classifier/load/"
+            else:
+                url = url_for('load_new_classifier', _external=True)
+        requests.post(url)
 
-    del X, y, transformed
-    gc.collect()
+        del X, y, transformed
+        gc.collect()
 
-    return {'current': total_images, 'total': total_images, 'step': 'Training',
-            'result': 'Training finished'}
+        content = {'task_id': self.task_id, 'status': 'FINISHED'}
+        r.hmset("train_recognizer", content)
 
+        #r.delete("train_recognizer")
 
-def augment_images(X, y, target, celery_binding):
-    """
-    Augments the images up to a certain number
-    :param X: Images to augment
-    :param y: Corresponding labels
-    :param target: The target number of images
-    :param celery_binding: the celery binding object, for updating the status
-    :return: The augmented images and corresponding labels
-    """
-    unq, unq_inv, unq_cnt = np.unique(y, return_inverse=True, return_counts=True)
-    unique_class_indices = np.split(np.argsort(unq_inv), np.cumsum(unq_cnt[:-1]))
-    y = np.asarray(y)
-    X = np.stack(X)
-    target_x = []
-    target_y = []
-    for unique_class in unq:
-        indices = unique_class_indices[unique_class]
-        diff = target - len(indices)
-        tmp_x = []
-        tmp_y = []
-        celery_binding.update_state(state='STARTED',
-                                    meta={'current': int(unique_class + 1), 'total': len(unique_class_indices),
-                                          'step': 'Augmenting'})
-        # Augment until target-len(indices) are generated
-        # Keras can't augment more images than it has received, so the process needs to be done multiple
-        # times, if less images than diff are available
-        while diff > 0:
-            batch_x, batch_y = augmenter.augment_array_target(X[indices], y[indices], diff)
-            tmp_x.extend(batch_x)
-            tmp_y.extend(batch_y)
-            diff = target - len(tmp_x)
-        target_x.extend(tmp_x)
-        target_y.extend(tmp_y)
-    return target_x, target_y
+        return {'current': total_images, 'total': total_images, 'step': 'Training',
+                'result': 'Training finished'}
+
+    def augment_images(self, images, labels, folder_names, target):
+        """
+        Augments the images up to a certain number
+        :param images: Images to augment
+        :param labels: Corresponding labels
+        :param target: The target number of images
+        :param celery_binding: the celery binding object, for updating the status
+        :return: The augmented images and corresponding labels
+        """
+        unq, unq_inv, unq_cnt = np.unique(labels, return_inverse=True, return_counts=True)
+
+        print("___________________________________")
+        print("augment_images...")
+        print("Labels:", labels)
+        print("Labels Unique:", unq)
+        print("Labels Unique Invers:", unq_inv)
+        print("Labels Unique Count:", unq_cnt)
+
+        # count the number of images that already exist for each user
+        unique_class_indices = np.split(np.argsort(unq_inv), np.cumsum(unq_cnt[:-1]))
+
+        target_x = images
+        target_y = labels
+        i = 0
+        for unique_class in unq:
+            print("Unique Class:", unique_class)
+            indices = unique_class_indices[unique_class]
+            #print("Unique Class Indeces:", indices)
+
+            folder_name = folder_names[unique_class]
+            print("Gallery:", folder_name)
+
+            number_of_missing_images = target - len(indices)
+            self.update_status('STARTED', {'current': int(unique_class + 1), 'total': len(unique_class_indices),
+                                  'step': 'Augmenting'})
+
+            print("Number of missing Images: ", number_of_missing_images)
+            batch_x = augmenter.augment_array_target(folder_name, number_of_missing_images)
+            batch_y = np.full(number_of_missing_images, unique_class)
+            print(" ")
+            print("batch_y:", batch_y)
+
+            target_x.extend(batch_x)
+            target_y.extend(batch_y)
+            i += 1
+        return target_x, target_y
 
 
 def create_classifier(clf_type="SVM", n_jobs=-1, k=5):
@@ -481,33 +541,6 @@ def classify(classifier, image, dists=False, neighbors=None):
     return results, bbs
 
 
-def annotate_live_image(image, classification_result):
-    """
-    annotates an image with bounding boxes, names and probabilities from the classification result
-    :param image: the image to annotate encoded as base64.
-    :param classification_result: a classification result with one or multiple faces. 
-    :return: a base64 encoded image with annotations
-    """
-    image = base64.b64decode(image)
-    image = np.fromstring(image, dtype=np.uint8)
-    image = cv2.imdecode(image, cv2.IMREAD_COLOR)
-    for prediction in classification_result['predictions']:
-        bb = prediction['bounding_box']
-        name = prediction['highest']
-        prob = prediction['probability']
-        if name == 'unknown':
-            text = name
-            color = (0, 0, 255)
-        else:
-            text = name + ': ' + str(round(prob, 2))
-            color = (0, 255, 0)
-        image = cv2.rectangle(image, pt1=(bb[0], bb[1]), pt2=(bb[0] + bb[2], bb[1] + bb[3]), color=color, thickness=1)
-        image = cv2.putText(image, text, (bb[0], bb[1] + bb[3] + 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, color, thickness=2)
-
-    #return base64.b64encode(cv2.imencode('.jpg', image)[1])
-    b64bytes = base64.b64encode(cv2.imencode('.jpg', image)[1])
-    return b64bytes.decode("utf-8")
 
 
 @app.context_processor
@@ -536,8 +569,11 @@ def annotate_processor():
             image = cv2.putText(image, text, (bb[0], bb[1] + bb[3] + 30),
                                 cv2.FONT_HERSHEY_SIMPLEX, 1, color, thickness=2)
 
-        #return base64.b64encode(cv2.imencode('.jpg', image)[1])
-        b64bytes = base64.b64encode(cv2.imencode('.jpg', image)[1])
-        return b64bytes.decode("utf-8")
+        return image_to_base64(image)
 
     return dict(annotate_db_image=annotate_db_image)
+
+
+def image_to_base64(image):
+    b64bytes = base64.b64encode(cv2.imencode('.jpg', image)[1])
+    return b64bytes.decode("utf-8")

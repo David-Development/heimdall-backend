@@ -1,6 +1,7 @@
 import os
 import glob
 import datetime
+import json
 
 from flask_restful import Resource, reqparse, marshal_with, fields, abort
 from sqlalchemy.exc import IntegrityError
@@ -13,8 +14,9 @@ import requests
 from .models import Gallery, Image, ClassifierStats, ClassificationResults, Result
 from app import api, app, db, recognizer, clf, labels, socketio, celery, r
 from .recognition import utils
+from .recognition.RecognitionManager import recognition_manager
 from .tasks import (sync_db_from_filesystem, delete_gallery, move_images, download_models, models_exist,
-                   train_recognizer, load_classifier, classify, new_image, annotate_live_image, clear_gallery)
+                    TrainRecognizer, load_classifier, new_image, clear_gallery)
 
 config = app.config
 
@@ -31,6 +33,9 @@ live_parser.add_argument('annotate')
 
 image_upload_parser = reqparse.RequestParser()
 image_upload_parser.add_argument('image')
+
+
+train_recognizer = TrainRecognizer()
 
 gallery_fields = {
     'id': fields.Integer,
@@ -232,12 +237,12 @@ def recent_classifications():
 def task_overview():
     tasks = {}
     for key in r.keys():
-        content = r.hgetall(key)
-        task_id = content['task_id']
-        if key == 'app.tasks.train_recognizer':
-            content['task_url'] = url_for('recognizer_training_status', task_id=task_id)
+        if key == 'train_recognizer':
+            content = train_recognizer.get_status()
+            content['task_url'] = url_for('recognizer_training_status')
+        else:
+            content = json.loads(r.get(key))
         tasks[key] = content
-        content['details'] = get_recognizer_training_status(task_id)
 
     return jsonify(tasks), 201
 
@@ -299,7 +304,20 @@ def model_download_status(task_id):
 
 @app.route("/teapot")
 def teapot():
+    recognition_manager.test()
     return jsonify({'message': 'I\'m a Teapot!'}), 418
+
+
+@app.route("/status")
+def status_recognition():
+    status_arr = recognition_manager.get_status()
+    # ["{}", "{}"]
+
+    status_arr_dict = []
+    for status in status_arr:
+        status_arr_dict.append(json.loads(status))
+
+    return jsonify(status_arr_dict), 200
 
 
 @app.route("/api/recognizer/init")
@@ -312,12 +330,15 @@ def init_recognizer():
         return jsonify(
             {'message': 'One ore more models are missing for the Recognizer to work.'}), 409
 
+import threading
 
 @app.route("/api/recognizer/train/")
 def training_recognizer():
-    task = train_recognizer.apply_async()
-    task_url = url_for('recognizer_training_status', task_id=task.id)
+    taskid = train_recognizer.run()
+
+    task_url = url_for('recognizer_training_status', task_id=taskid)
     return jsonify({'message': 'Training started', 'location': task_url}), 202, {'Location': task_url}
+    #return jsonify({'message': 'Training started', }), 202
 
 
 @app.route("/api/image/upload/", methods=['POST'])
@@ -348,132 +369,36 @@ def new_live_image():
 
     latest_clf = ClassifierStats.query.order_by(ClassifierStats.date.desc()).first()
     if latest_clf:
-        result = classify_db_image(id)
+        #result = classify_db_image(id)
+
+        recognition_manager.add_image(id)
 
         #with app.app_context():
         #    url = url_for('classify_db_image', image_id=id, _external=True)
         #r = requests.get(url)
         #result = r.json()
-        if len(result['predictions']) > 0 and annotate:
-            image = annotate_live_image(image, result)
+        #if len(result['predictions']) > 0 and annotate:
+        #    image = annotate_live_image(image, result)
 
-        print(result)
+        #print(result)
 
-        socketio.emit('new_image', json.dumps({'image': image,
-                                            'image_id': id,
-                                            'classification': result}))
-
-    return jsonify({'message': 'Image processed'}), 200
-
-
-#@app.route("/api/recognizer/classify/<image_id>")
-def classify_db_image(image_id):
-    db_image = Image.query.filter_by(id=image_id).first()
-    image_path = os.path.join(config['BASEDIR'], db_image.path)
-    image = utils.load_image(image_path)
-
-    time_before_classification = datetime.datetime.now()
-
-    results, bbs = classify(app.clf, image)
-
-    time_after_classification = datetime.datetime.now()
-    diff = time_after_classification - time_before_classification
-
-    latest_clf = ClassifierStats.query.order_by(ClassifierStats.date.desc()).first()
-    classification_result = ClassificationResults(clf_id=latest_clf.id, image_id=db_image.id,
-                                                  date=datetime.datetime.now())
-    db.session.add(classification_result)
-    db.session.flush()
-
-    predictions = []
-    # For each detected face
-    for faces, bb in zip(results, bbs):
-        # Save the highest probability (the result)
-        highest = np.argmax(faces)
-        prob = np.max(faces)
-
-        # If the probability is less then the configures threshold, the person is unknown
-        if prob < config['PROBABILITY_THRESHOLD']:
-            label = 'unknown'
-        else:
-            label = app.labels[highest]
-        gallery = Gallery.query.filter_by(name=label).first()
-        db.session.add(
-            Result(classification=classification_result.id, gallery_id=gallery.id, probability=prob, bounding_box=bb))
-        prediction_dict = {}
-        prediction_result_dict = {'highest': label,
-                                  'bounding_box': bb,
-                                  'probability': round(prob, 4)}
-        # All probabilities
-        for idx, prediction in enumerate(faces):
-            prediction_dict[app.labels[idx]] = round(prediction, 4)
-        prediction_result_dict['probabilities'] = prediction_dict
-
-        predictions.append(prediction_result_dict)
-
-        db.session.commit()
-
-
-    with open("timings.txt", "a") as timing_file:
-        text = str(datetime.datetime.now()) + " - Time needed for classification: " + str(diff) + \
-               " - Faces Count: " + str(len(bbs)) + "\n"
-        timing_file.write(text)
-
-
-    return {'message': 'classification complete',
-                    'predictions': predictions,
-                    'bounding_boxes': bbs}
-    #return jsonify({'message': 'classification complete',
-    #                'predictions': predictions,
-    #                'bounding_boxes': bbs})
-
-
-@app.route("/api/recognizer/train/status/<task_id>")
-def recognizer_training_status(task_id):
-    task = train_recognizer.AsyncResult(task_id)
-    response = {
-        'state': task.state,
-        'current': task.info.get('current'),
-        'total': task.info.get('total'),
-        'step': task.info.get('step', ''),
-        'model': task.info.get('model', '')
-    }
-    if 'result' in task.info:
-        response['result'] = task.info['result']
-
-    return jsonify(response)
-
-#def fullname(o):
-#  return o.__module__ + "." + o.__class__.__name__
-
-def get_recognizer_training_status(task_id):
-    task = train_recognizer.AsyncResult(task_id)
-
-    #print fullname(task.info)
-
-    if task.info is None:
-        response = {
-            'state': task.state
-        }
-    elif task.state == "FAILURE":
-    #elif isinstance(task.info, celery.backends.base.WorkerLostError):
-        response = {
-            'state': task.state
-        }
+        #socketio.emit('new_image', json.dumps({'image': image,
+        #                                    'image_id': id,
+        #                                    'classification': result}))
+        return jsonify({'message': 'Image processed'}), 200
     else:
-        response = {
-            'state': task.state,
-            'current': task.info.get('current'),
-            'total': task.info.get('total'),
-            'step': task.info.get('step', ''),
-            'model': task.info.get('model', '')
-        }
+        return jsonify({'message': 'No classifier present!'}), 500
 
-        if 'result' in task.info:
-            response['result'] = task.info['result']
 
-    return response
 
+@app.route("/api/recognizer/train/status")
+def recognizer_training_status():
+    return jsonify(train_recognizer.get_status()), 200
+
+
+@app.route("/api/classifier/")
+def get_classifier():
+    return jsonify(ClassifierStats.query.order_by(ClassifierStats.loaded.desc(), ClassifierStats.date.desc()).all()), 200
 
 @app.route("/api/classifier/load/", methods=['POST'])
 def load_new_classifier():
@@ -483,7 +408,8 @@ def load_new_classifier():
     db_model = ClassifierStats.query.order_by(ClassifierStats.date.desc()).first()
     app.labels = db_model.labels_as_dict()
     old_model = ClassifierStats.query.filter_by(loaded=True).first()
-    old_model.loaded = False
+    if old_model:
+        old_model.loaded = False
     db_model.loaded = True
     db.session.commit()
 
@@ -529,15 +455,3 @@ def connect_live_view():
 @socketio.on('disconnect')
 def disconnect_live_view():
     send('disconnected')
-
-
-@task_postrun.connect
-def on_task_postrun(task_id, task, retval, *args, **kwargs):
-    content = {'task_id': task_id, 'status': 'Finished'}
-    r.hmset(task.name, content)
-
-
-@task_prerun.connect
-def on_task_prerun(task_id, task, *args, **kwargs):
-    content = {'task_id': task_id, 'status': 'Started'}
-    r.hmset(task.name, content)
