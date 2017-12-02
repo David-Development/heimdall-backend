@@ -24,7 +24,7 @@ def load_dataset(path, grayscale=True, pil=False):
                             if grayscale:
                                 im = im.convert("L")
                         else:
-                            print("Path: " + os.path.join(subject_path, filename))
+                            #print("Path: " + os.path.join(subject_path, filename))
                             im = cv2.imread(os.path.join(subject_path, filename))
                             if grayscale:
                                 im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
