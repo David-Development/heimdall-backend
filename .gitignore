@@ -1,8 +1,11 @@
+*.DS_Store
+
 # Created by .ignore support plugin (hsz.mobi)
 ### Example user template
 
-*images/*/*.png
-*images/*/*.JPG
+app/images/*/*.png
+app/images/*/*/*.jpg
+app/ml_models/*.pkl
 migrations/
 *subjects/*/
 !*subjects/unknown
