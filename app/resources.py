@@ -8,11 +8,10 @@ from sqlalchemy.exc import IntegrityError
 from flask import jsonify, send_from_directory, request, url_for, render_template, json
 import numpy as np
 from flask_socketio import send
-from celery.signals import task_prerun, task_postrun
 import requests
 
 from .models import Gallery, Image, ClassifierStats, ClassificationResults, Result
-from app import api, app, db, recognizer, clf, labels, socketio, celery, r
+from app import api, app, db, recognizer, clf, labels, socketio, r
 from .recognition import utils
 from .recognition.RecognitionManager import recognition_manager
 from .tasks import (sync_db_from_filesystem, delete_gallery, move_images, download_models, models_exist,

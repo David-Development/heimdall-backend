@@ -17,7 +17,7 @@ from sklearn.externals import joblib
 import numpy as np
 import cv2
 
-from app import db, app, celery, recognizer, socketio, clf, r
+from app import db, app, recognizer, socketio, clf, r
 from .models import Gallery, Image, ClassifierStats, Labels, ClassificationResults
 
 from .recognition import utils, augmenter
@@ -174,7 +174,6 @@ def move_images(gallery, images):
         shutil.move(image_path, os.path.join(dest_gallery_path, image.name))
 
 
-@celery.task(bind=True)
 def download_models(self):
     """
     Downloads multiple pretrained models for dlib

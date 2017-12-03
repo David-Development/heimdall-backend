@@ -8,7 +8,6 @@ from flask_appconfig import AppConfig
 from flask_restful import Api
 from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
-from celery import Celery
 import redis
 
 from .recognition.Recognition import Recognizer
@@ -41,8 +40,6 @@ socketio = SocketIO()
 recognizer = Recognizer(shape_predictor_path=app.config['DLIB_SHAPE_PREDICTOR_PATH'],
                         descriptor_model_path=app.config['DLIB_FACE_RECOGNITION_MODEL_PATH'])
 
-celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
-celery.conf.update(app.config)
 
 clf = None
 labels = {}
@@ -68,12 +65,9 @@ def extensions(flask_app, main):
     else:
         r.flushdb()
         # Initialize SocketIO to emit events through the message queue.
-        # Celery does not use eventlet. Therefore, we have to set async_mode
-        # explicitly.
         socketio.init_app(None,
                           message_queue='redis://' + app.config['REDIS_HOST'] + ':' + app.config['REDIS_PORT'])
-    celery.conf.update(flask_app.config)
-
+    
     return None
 
 
