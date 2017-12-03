@@ -7,11 +7,10 @@ from flask_restful import Resource, reqparse, marshal_with, fields, abort
 from sqlalchemy.exc import IntegrityError
 from flask import jsonify, send_from_directory, request, url_for, render_template, json
 import numpy as np
-from flask_socketio import send
 import requests
 
 from .models import Gallery, Image, ClassifierStats, ClassificationResults, Result
-from app import api, app, db, recognizer, clf, labels, socketio, r
+from app import api, app, db, recognizer, clf, labels, r
 from .recognition import utils
 from .recognition.RecognitionManager import recognition_manager
 from .tasks import (sync_db_from_filesystem, delete_gallery, move_images, download_models, models_exist,
@@ -444,13 +443,3 @@ def delete_classifier_model(model_id):
         abort(409, description="Error occured while deleting model file from disk")
     db.session.commit()
     return jsonify({'message': 'model deleted'}), 200
-
-
-@socketio.on('connect')
-def connect_live_view():
-    send('connected')
-
-
-@socketio.on('disconnect')
-def disconnect_live_view():
-    send('disconnected')

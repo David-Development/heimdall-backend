@@ -7,23 +7,22 @@ from app.recognition import RecognitionManager
 
 from flask_script import Manager
 from flask_migrate import Migrate, MigrateCommand
-from app import create_app, db, socketio, init_models
+from app import create_app, db, init_models
 
 app = create_app()
 manager = Manager(app)
 migrate = Migrate(app, db)
 
-RecognitionManager.init(app, socketio, db)
+RecognitionManager.init(app, db)
 
 
 @manager.command
 def run():
     init_models()
-    socketio.run(app,
-                 debug=True,
-                 host='0.0.0.0',
-                 port=5000,
-                 use_reloader=True)
+    app.run(debug=True,
+            host='0.0.0.0',
+            port=5000,
+            use_reloader=True)
 
 
 manager.add_command('db', MigrateCommand)

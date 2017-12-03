@@ -6,20 +6,12 @@ import logging
 from flask import Flask
 from flask_appconfig import AppConfig
 from flask_restful import Api
-from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
 import redis
 
 from .recognition.Recognition import Recognizer
 
 
-
-
-
-
-
-
-logging.getLogger('socketio').setLevel(logging.ERROR)
 logging.getLogger('engineio').setLevel(logging.ERROR)
 
 eventlet.monkey_patch() # this removes multithreading options
@@ -28,18 +20,14 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 app = Flask(__name__)
 app.debug = True
-
 api = Api(app)
+
 AppConfig(app, os.path.join(basedir, 'default_config.py'))
 db = SQLAlchemy(app)
 r = redis.StrictRedis(host=app.config['REDIS_HOST'], port=app.config['REDIS_PORT'], db=1, charset="utf-8", decode_responses=True)
 
-# turn the flask app into a socketio app
-socketio = SocketIO()
-
 recognizer = Recognizer(shape_predictor_path=app.config['DLIB_SHAPE_PREDICTOR_PATH'],
                         descriptor_model_path=app.config['DLIB_FACE_RECOGNITION_MODEL_PATH'])
-
 
 clf = None
 labels = {}
@@ -47,29 +35,8 @@ labels = {}
 # This import needs to come after we initialized the database
 from . import models, resources
 
-
 def create_app(main=True):
-    # Initialize extensions
-    extensions(app, main)
-
     return app
-
-
-def extensions(flask_app, main):
-    logger = False
-
-    if main:
-        # Initialize SocketIO as server and connect it to the message queue.
-        socketio.init_app(flask_app,
-                          message_queue='redis://' + app.config['REDIS_HOST'] + ':' + app.config['REDIS_PORT'])
-    else:
-        r.flushdb()
-        # Initialize SocketIO to emit events through the message queue.
-        socketio.init_app(None,
-                          message_queue='redis://' + app.config['REDIS_HOST'] + ':' + app.config['REDIS_PORT'])
-    
-    return None
-
 
 def init_models():
     # Resync database on startup

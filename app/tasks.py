@@ -17,7 +17,7 @@ from sklearn.externals import joblib
 import numpy as np
 import cv2
 
-from app import db, app, recognizer, socketio, clf, r
+from app import db, app, recognizer, clf, r
 from .models import Gallery, Image, ClassifierStats, Labels, ClassificationResults
 
 from .recognition import utils, augmenter

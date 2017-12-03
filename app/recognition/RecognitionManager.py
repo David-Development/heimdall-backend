@@ -9,7 +9,6 @@ import traceback
 import json
 
 app = None
-socketio = None
 db = None
 
 
@@ -48,7 +47,6 @@ class RecognitionManager:
 
 class RecognitionManager:
     global app
-    global socketio
     global db
 
     def __init__(self):
@@ -116,9 +114,10 @@ class RecognitionManager:
             # print("Image Path: ", image_path)
             # cv2.imwrite('/app/app/images/new/test.jpg', image)
 
-            socketio.emit('new_image', json.dumps({'image': image_to_base64(image),
-                                                   'image_id': image_id,
-                                                   'classification': result}))
+            # TODO mqtt new image
+            #socketio.emit('new_image', json.dumps({'image': image_to_base64(image),
+            #                                       'image_id': image_id,
+            #                                       'classification': result}))
 
             print("Result: ", result)
             result = json.dumps(result)
@@ -160,13 +159,11 @@ class RecognitionManager:
 recognition_manager = RecognitionManager()
 
 
-def init(app1, socketio1, db1):
+def init(app1, db1):
     global app
-    global socketio
     global db
 
     app = app1
-    socketio = socketio1
     db = db1
     pass
 
