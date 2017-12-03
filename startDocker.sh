@@ -9,9 +9,6 @@ cp app/default_config_docker.py app/default_config.py
 export PYTHONUNBUFFERED=TRUE
 set DISPLAY :0
 
-# Cleanup
-echo "" > celeryd.log
-rm celeryd.pid
 
 if [ -f "$setup_file" ]
 then
@@ -35,10 +32,6 @@ else
     echo "done!"
     echo "##################################################"
 fi
-
-
-#echo "start celery..."
-#celery worker --detach -A celery_worker.celery --loglevel=DEBUG --logfile celeryd.log
 
 echo "run..."
 $python manage.py run
