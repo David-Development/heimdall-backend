@@ -176,3 +176,5 @@ crashlytics-build.properties
 fabric.properties
 .idea/
 /app/default_config.py
+
+timings\.txt
