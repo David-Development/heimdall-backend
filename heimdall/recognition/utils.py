@@ -28,9 +28,9 @@ def load_dataset(path, grayscale=True, pil=False):
                             im = cv2.imread(os.path.join(subject_path, filename))
                             if grayscale:
                                 im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
-                            else:
-                                # use a sane color order
-                                im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+                            #else:
+                            #    # use a sane color order
+                            #    im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
                         im = np.asarray(im, dtype=np.uint8)
                         im.setflags(write=True)
                         X.append(im)
@@ -44,8 +44,8 @@ def load_image(path, grayscale=False):
     im = cv2.imread(path)
     if grayscale:
         im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
-    else:
-        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+    #else:
+    #    im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
     return im
 
 
