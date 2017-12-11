@@ -8,6 +8,8 @@ import multiprocessing
 import traceback
 import json
 
+from heimdall.app import mqtt
+
 app = None
 db = None
 
@@ -92,7 +94,7 @@ class RecognitionManager:
             print("Job started!")
             redis, image_id = data[0]
             # print("------------")
-            # print("App: ", app)
+            # print("App: ", heimdall)
             # print("DB: ", db)
             # print("Config: ", config)
             # print("Image id:", image_id)
@@ -110,19 +112,19 @@ class RecognitionManager:
                 image = annotate_live_image(image, result)
 
             # print("Image Path: ", image_path)
-            # cv2.imwrite('/app/app/images/new/test.jpg', image)
+            # cv2.imwrite('/heimdall/heimdall/images/new/test.jpg', image)
 
             # TODO mqtt new image
             #socketio.emit('new_image', json.dumps({'image': image_to_base64(image),
             #                                       'image_id': image_id,
             #                                       'classification': result}))
 
-
-
-
-
-            print("Result: ", result)
+            #print("Result: ", result)
             result = json.dumps(result)
+
+            mqtt.publish("recognitions/person", payload=result, qos=0, retain=True)
+            mqtt.publish("recognitions/image", payload=image_to_base64(image), qos=0, retain=True)
+
             redis.rpush("test", result)
         except Exception as e:
             print("Exception: ", e)
@@ -130,7 +132,7 @@ class RecognitionManager:
     def add_image(self, image_id):
         print("Scheduling!")
 
-        #print(app)
+        #print(heimdall)
         #print(socketio)
         #print(db)
         print(image_id)
@@ -174,12 +176,17 @@ def init(app1, db1):
 
 
 import datetime
-from . import utils
-from ..models import Gallery, Image, ClassifierStats, ClassificationResults, Result
-from ..tasks import classify
+from heimdall.recognition import utils
+from heimdall.models.Gallery import Gallery
+from heimdall.models.Image import Image
+from heimdall.models.ClassifierStats import ClassifierStats
+from heimdall.models.ClassificationResults import ClassificationResults
+from heimdall.models.RecognitionResult import RecognitionResult
+from heimdall.tasks import classify
 import numpy as np
 import base64
 import cv2
+
 
 def classify_db_image(db_image_id, image):
     time_before_classification = datetime.datetime.now()
@@ -209,7 +216,7 @@ def classify_db_image(db_image_id, image):
             label = app.labels[highest]
         gallery = Gallery.query.filter_by(name=label).first()
         db.session.add(
-            Result(classification=classification_result.id, gallery_id=gallery.id, probability=prob, bounding_box=bb))
+            RecognitionResult(classification=classification_result.id, gallery_id=gallery.id, probability=prob, bounding_box=bb))
         prediction_dict = {}
         prediction_result_dict = {'highest': label,
                                   'bounding_box': bb,
@@ -258,7 +265,6 @@ def annotate_live_image(image, classification_result):
                             cv2.FONT_HERSHEY_SIMPLEX, 1, color, thickness=2)
 
     return image
-    #return image_to_base64(image)
 
 
 def image_to_base64(image):

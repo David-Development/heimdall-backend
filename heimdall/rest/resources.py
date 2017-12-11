@@ -9,13 +9,17 @@ from sqlalchemy.exc import IntegrityError
 from flask import jsonify, send_from_directory, request, url_for, render_template, json
 import numpy as np
 import requests
+from heimdall.models.Gallery import Gallery
+from heimdall.models.Image import Image
+from heimdall.models.ClassifierStats import ClassifierStats
+from heimdall.models.ClassificationResults import ClassificationResults
+from heimdall.models.RecognitionResult import RecognitionResult
 
-from .models import Gallery, Image, ClassifierStats, ClassificationResults, Result
-from app import api, app, db, recognizer, clf, labels, r, mqtt
-from .recognition import utils
-from .recognition.RecognitionManager import recognition_manager
-from .tasks import (sync_db_from_filesystem, delete_gallery, move_images, download_models, models_exist,
-                    TrainRecognizer, load_classifier, new_image, clear_gallery)
+from heimdall.app import api, app, db, recognizer, clf, labels, redis, mqtt
+from heimdall.recognition import utils
+from heimdall.recognition.RecognitionManager import recognition_manager
+from heimdall.tasks import (sync_db_from_filesystem, delete_gallery, move_images, download_models, models_exist,
+                            TrainRecognizer, load_classifier, new_image, clear_gallery)
 
 config = app.config
 
@@ -38,7 +42,7 @@ train_recognizer = TrainRecognizer()
 
 @mqtt.on_message()
 def handle_mqtt_message(client, userdata, message):
-    print(message.topic)
+    print("mqtt.on_message():", message.topic)
 
 
 @mqtt.on_topic('camera')
@@ -58,10 +62,11 @@ def handle_mytopic(client, userdata, message):
 
 
 
+'''
 @mqtt.on_log()
 def handle_logging(client, userdata, level, buf):
     print(level, buf)
-
+'''
 
 
 
@@ -153,7 +158,7 @@ class GalleryRes(Resource):
             image.path = os.path.join(gallery_new.path, image.name)
 
         # Delete all Results for this Person/Gallery
-        Result.query.filter_by(gallery_id=gallery_id).delete()
+        RecognitionResult.query.filter_by(gallery_id=gallery_id).delete()
         Gallery.query.filter_by(id=gallery_id).delete()
         db.session.commit()
 
@@ -264,7 +269,7 @@ def recent_classifications():
 @app.route("/api/tasks/")
 def task_overview():
     tasks = {}
-    for key in r.keys():
+    for key in redis.keys():
         if key == 'train_recognizer':
             content = train_recognizer.get_status()
             content['task_url'] = url_for('recognizer_training_status')
@@ -401,10 +406,10 @@ def new_live_image():
 
         recognition_manager.add_image(id)
 
-        #with app.app_context():
+        #with heimdall.app_context():
         #    url = url_for('classify_db_image', image_id=id, _external=True)
         #r = requests.get(url)
-        #result = r.json()
+        #result = redis.json()
         #if len(result['predictions']) > 0 and annotate:
         #    image = annotate_live_image(image, result)
 

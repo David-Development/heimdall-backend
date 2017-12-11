@@ -48,7 +48,7 @@ class Augmenter:
             color = False
 
         #d, l = self.generator.flow(images, labels, batch_size=target).next()
-        d, l = self.generator.flow(images, labels, batch_size=target, save_to_dir="./app/images/augmented_keras/").next()
+        d, l = self.generator.flow(images, labels, batch_size=target, save_to_dir="./heimdall/images/augmented_keras/").next()
         # remove dummy color channel
         if not color:
             d = d[:, :, :, 0]

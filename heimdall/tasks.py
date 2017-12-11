@@ -17,16 +17,20 @@ from sklearn.externals import joblib
 import numpy as np
 import cv2
 
-from app import db, app, recognizer, clf, r
-from .models import Gallery, Image, ClassifierStats, Labels, ClassificationResults
+from heimdall.app import db, recognizer, clf, redis, app
+from heimdall.models.Gallery import Gallery
+from heimdall.models.Image import Image
+from heimdall.models.ClassifierStats import ClassifierStats
+from heimdall.models.Labels import Labels
+from heimdall.models.ClassificationResults import ClassificationResults
 
-from .recognition import utils, augmenter
+from heimdall.recognition import utils, augmenter
 
 import scikitplot
 import matplotlib.pyplot as plt
 
-config = app.config
 
+config = app.config
 
 def sync_db_from_filesystem():
     """
@@ -267,10 +271,10 @@ class TrainRecognizer:
 
     def __init__(self):
         self.task_id = random.randint(0, 1000000)
-        r.delete("train_recognizer")
+        redis.delete("train_recognizer")
 
     def get_status(self):
-        status = r.get("train_recognizer")
+        status =redis.get("train_recognizer")
         if status:
             return json.loads(status)
         return {}
@@ -288,9 +292,9 @@ class TrainRecognizer:
     def update_status(self, state, meta):
         content = json.dumps({'task_id': self.task_id, 'status': {'state': state, 'meta': meta}})
         print("Content:", content)
-        # r.hset("train_recognizer", self.task_id, content)
-        # r.hmset("train_recognizer", content)
-        r.set("train_recognizer", content)
+        # redis.hset("train_recognizer", self.task_id, content)
+        # redis.hmset("train_recognizer", content)
+        redis.set("train_recognizer", content)
 
     def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
         """
@@ -391,17 +395,17 @@ class TrainRecognizer:
         save_classifier(classifier, path)
 
         with app.app_context():
-            if config['HEIMDALL_DOCKER_BACKEND']:
-                url = "http://" + config['HEIMDALL_DOCKER_BACKEND'] + "/api/classifier/load/"
+            if config['DOCKER']:
+                url = "http://heimdall:5000/api/classifier/load/"
             else:
                 url = url_for('load_new_classifier', _external=True)
-        requests.post(url)
+            requests.post(url)
 
         del X, y, transformed
         gc.collect()
 
         content = {'task_id': self.task_id, 'status': 'FINISHED'}
-        r.hmset("train_recognizer", content)
+        redis.hmset("train_recognizer", content)
 
         #r.delete("train_recognizer")
 
@@ -542,7 +546,8 @@ def classify(classifier, image, dists=False, neighbors=None):
 
 
 
-@app.context_processor
+# TODO remove method below!
+#@app.context_processor
 def annotate_processor():
     """
     create context processors for use in jinja2 templates

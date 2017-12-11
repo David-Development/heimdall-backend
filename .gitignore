@@ -3,9 +3,10 @@
 # Created by .ignore support plugin (hsz.mobi)
 ### Example user template
 
-app/images/*/*.png
-app/images/*/*/*.jpg
-app/ml_models/*.pkl
+heimdall/images/*/*.png
+heimdall/images/*/*jpg
+heimdall/images/*/*/*.jpg
+heimdall/ml_models/*.pkl
 migrations/
 *subjects/*/
 !*subjects/unknown

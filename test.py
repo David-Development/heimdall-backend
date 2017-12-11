@@ -4,7 +4,7 @@ import sys
 import redis
 import concurrent.futures
 import cv2
-from app.mqtt_handler import MqttHandler
+from heimdall.mqtt_handler import MqttHandler
 import time
 
 r = redis.StrictRedis(host="redis", port="6379", charset="utf-8", decode_responses=True)

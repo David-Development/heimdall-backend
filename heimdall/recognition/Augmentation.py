@@ -13,7 +13,7 @@ class Augmenter:
 
     def augment_array_target(self, subject_name, batch_size):
 
-        subject_path = "./app/images/subjects/" + subject_name + "/"
+        subject_path = "./heimdall/images/subjects/" + subject_name + "/"
         pipeline = Augmentor.Pipeline(subject_path)
         pipeline.rotate(probability=0.5, max_left_rotation=10, max_right_rotation=10)
         pipeline.zoom(probability=0.5, min_factor=1.0, max_factor=1.1)
