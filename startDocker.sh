@@ -5,7 +5,6 @@ setup_file="/setup_done"
 
 python="python3" # "python3" or "python"
 
-cp app/default_config_docker.py app/default_config.py
 export PYTHONUNBUFFERED=TRUE
 set DISPLAY :0
 
@@ -35,5 +34,4 @@ fi
 
 echo "run..."
 $python manage.py run
-
 #$python test.py

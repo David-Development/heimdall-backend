@@ -18,3 +18,5 @@ matplotlib==2.1.0
 scikit-plot==0.3.3
 psycopg2==2.7.3.2
 augmentor==0.1.8
+#paho-mqtt==1.3.1
+flask-mqtt==0.0.9

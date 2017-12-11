@@ -3,6 +3,7 @@ import glob
 import datetime
 import json
 
+import binascii
 from flask_restful import Resource, reqparse, marshal_with, fields, abort
 from sqlalchemy.exc import IntegrityError
 from flask import jsonify, send_from_directory, request, url_for, render_template, json
@@ -10,7 +11,7 @@ import numpy as np
 import requests
 
 from .models import Gallery, Image, ClassifierStats, ClassificationResults, Result
-from app import api, app, db, recognizer, clf, labels, r
+from app import api, app, db, recognizer, clf, labels, r, mqtt
 from .recognition import utils
 from .recognition.RecognitionManager import recognition_manager
 from .tasks import (sync_db_from_filesystem, delete_gallery, move_images, download_models, models_exist,
@@ -32,8 +33,37 @@ live_parser.add_argument('annotate')
 image_upload_parser = reqparse.RequestParser()
 image_upload_parser.add_argument('image')
 
-
 train_recognizer = TrainRecognizer()
+
+
+@mqtt.on_message()
+def handle_mqtt_message(client, userdata, message):
+    print(message.topic)
+
+
+@mqtt.on_topic('camera')
+def handle_mytopic(client, userdata, message):
+    topic = message.topic
+    print("===========")
+    print("Topic:", topic)
+
+    if topic == "camera":
+        try:
+            image = message.payload.decode()
+            filename = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')[:-3]) + '.jpg'
+            id = new_image(image, filename)
+            recognition_manager.add_image(image_id=id)
+        except binascii.Error as err:
+            print(err)
+
+
+
+@mqtt.on_log()
+def handle_logging(client, userdata, level, buf):
+    print(level, buf)
+
+
+
 
 gallery_fields = {
     'id': fields.Integer,

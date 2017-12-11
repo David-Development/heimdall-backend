@@ -15,14 +15,14 @@ migrate = Migrate(app, db)
 
 RecognitionManager.init(app, db)
 
-
 @manager.command
 def run():
     init_models()
-    app.run(debug=True,
-            host='0.0.0.0',
+
+    app.run(host='0.0.0.0',
             port=5000,
-            use_reloader=True)
+            use_reloader=False,
+            debug=True)
 
 
 manager.add_command('db', MigrateCommand)

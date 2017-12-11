@@ -4,6 +4,7 @@ import glob
 import logging
 
 from flask import Flask
+from flask_mqtt import Mqtt
 from flask_appconfig import AppConfig
 from flask_restful import Api
 from flask_sqlalchemy import SQLAlchemy
@@ -12,15 +13,31 @@ import redis
 from .recognition.Recognition import Recognizer
 
 
+
 logging.getLogger('engineio').setLevel(logging.ERROR)
 
-eventlet.monkey_patch() # this removes multithreading options
+eventlet.monkey_patch()
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 app = Flask(__name__)
-app.debug = True
+
 api = Api(app)
+
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.config['MQTT_BROKER_URL'] = 'mqtt-broker'
+app.config['MQTT_BROKER_PORT'] = 1883
+app.config['MQTT_USERNAME'] = ''
+app.config['MQTT_PASSWORD'] = ''
+app.config['MQTT_REFRESH_TIME'] = 1.0  # refresh time in seconds
+app.config['MQTT_KEEPALIVE'] = 5
+app.config['MQTT_TLS_ENABLED'] = False
+mqtt = Mqtt(app)
+
+if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+    # The app is not in debug mode or we are in the reloaded process
+    print("Subscribing to topic!")
+    mqtt.subscribe('camera')
 
 AppConfig(app, os.path.join(basedir, 'default_config.py'))
 db = SQLAlchemy(app)
@@ -34,6 +51,8 @@ labels = {}
 
 # This import needs to come after we initialized the database
 from . import models, resources
+
+
 
 def create_app(main=True):
     return app

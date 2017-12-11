@@ -105,8 +105,6 @@ class RecognitionManager:
 
             result = classify_db_image(db_image.id, image)
 
-            print(result)
-
             annotate = True
             if len(result['predictions']) > 0 and annotate:
                 image = annotate_live_image(image, result)
@@ -118,6 +116,10 @@ class RecognitionManager:
             #socketio.emit('new_image', json.dumps({'image': image_to_base64(image),
             #                                       'image_id': image_id,
             #                                       'classification': result}))
+
+
+
+
 
             print("Result: ", result)
             result = json.dumps(result)
