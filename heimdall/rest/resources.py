@@ -381,7 +381,17 @@ def resync_db():
 
 @app.route('/images/<path:filename>')
 def show_images(filename):
-    return send_from_directory(config['IMAGE_BASE_PATH'], filename)
+    try:
+        im = PILImage.open(config['IMAGE_BASE_PATH'] + '/' + filename)
+        #im.thumbnail((w, h), Image.ANTIALIAS)
+        io = BytesIO()
+        im.save(io, format='JPEG')
+        return Response(io.getvalue(), mimetype='image/jpeg')
+    except IOError:
+        abort(404)
+
+    # Method below returns ERR_CONTENT_LENGTH_MISMATCH sometimes
+    #return send_from_directory(config['IMAGE_BASE_PATH'], filename)
 
 
 @app.route("/api/dlib_models/", methods=['GET', 'POST'])
