@@ -7,6 +7,7 @@ from flask import Flask
 from flask_mqtt import Mqtt
 from flask_restful import Api
 from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
 
 from heimdall.settings import DockerConfig
 
@@ -37,6 +38,8 @@ def create_app(config_object=DockerConfig, main=True):
     app = Flask(__name__)
     app.config.from_object(config_object)
     #print(app.config)
+
+    CORS(app)
 
 
     # Init API
