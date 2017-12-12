@@ -7,7 +7,7 @@ class RecognitionResult(db.Model):
     """
     Represents a classification result from a single face inside an image.
     """
-    __tablename__ = 'result'
+    __tablename__ = 'recognitionresult'
 
     id = db.Column(db.Integer, primary_key=True)
     classification = db.Column(db.Integer, db.ForeignKey('classificationresults.id', ondelete='CASCADE'))

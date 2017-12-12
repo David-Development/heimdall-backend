@@ -120,10 +120,11 @@ class RecognitionManager:
             #                                       'classification': result}))
 
             #print("Result: ", result)
+            result["img_path"] = "http://localhost:5000/" + db_image.path
             result = json.dumps(result)
 
             mqtt.publish("recognitions/person", payload=result, qos=0, retain=True)
-            mqtt.publish("recognitions/image", payload=image_to_base64(image), qos=0, retain=True)
+            #mqtt.publish("recognitions/image", payload=image_to_base64(image), qos=0, retain=True)
 
             redis.rpush("test", result)
         except Exception as e:

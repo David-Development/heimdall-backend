@@ -6,11 +6,14 @@ import json
 import binascii
 from flask_restful import Resource, reqparse, marshal_with, fields, abort
 from sqlalchemy.exc import IntegrityError
-from flask import jsonify, send_from_directory, request, url_for, render_template, json
+from flask import jsonify, send_from_directory, request, url_for, render_template, json, Response, abort
+from io import BytesIO
+from PIL import Image as PILImage
 import numpy as np
 import requests
 from heimdall.models.Gallery import Gallery
 from heimdall.models.Image import Image
+from heimdall.models.Event import Event
 from heimdall.models.ClassifierStats import ClassifierStats
 from heimdall.models.ClassificationResults import ClassificationResults
 from heimdall.models.RecognitionResult import RecognitionResult
@@ -265,6 +268,89 @@ def recent_classifications():
     return render_template('recent_classifications.html', title="Recent Classifications",
                            classifications=classifications, galleries=gls)
 
+
+def getDetectionResults(image_id):
+    detectionList = []
+    for classif in ClassificationResults.query.filter(ClassificationResults.image_id == image_id).all():
+        res = classif.results.first()
+        empDict = {
+            #'id': classif.id,
+            'id': res.gallery_id,
+            'location': [res.x, res.y, res.w, res.h]
+        }
+        detectionList.append(empDict)
+    #print(detectionList)
+    return detectionList
+
+def getImagesForEvent(event_id):
+    imageList = []
+    for image in Image.query.filter(Image.event_id == event_id).limit(5).all():
+        empDict = {
+            'id': image.id,
+            'url': "http://localhost:5000/" + image.path,
+            'detected': getDetectionResults(image.id)
+        }
+        imageList.append(empDict)
+    return imageList
+
+@app.route("/events/", methods=['GET'])
+def getEvents():
+    eventList = []
+    for event in Event.query.order_by(Event.begindate).all():
+        empDict = {
+            'id': event.id,
+            'date': event.begindate.date().isoformat(),
+            'time': event.begindate.time().isoformat(),
+            'images': getImagesForEvent(event.id)
+        }
+
+        if len(empDict['images']) > 0:
+            eventList.append(empDict)
+
+    return jsonify(eventList), 201
+
+@app.route("/persons/", methods=['GET'])
+def getPersons():
+    galleryList = []
+    for gallery in Gallery.query.filter(Gallery.name != "unkown").all():
+        empDict = {
+            'id': gallery.id,
+            'name': gallery.name,
+            'path': "http://localhost:5000/" + gallery.path,
+            'subject_gallery': gallery.subject_gallery,
+            'images': gallery.images.count(),
+            'avatar': gallery.images.first().path
+        }
+
+        galleryList.append(empDict)
+
+    return jsonify(galleryList), 201
+
+
+def getImagesForPerson(query):
+    imageList = []
+    for image in query.all():
+        empDict = {
+            'id': image.id,
+            'path': "http://localhost:5000/" + image.path
+        }
+        imageList.append(empDict)
+    return imageList
+
+@app.route("/person/<int:person_id>/", methods=['GET'])
+def getPersonById(person_id):
+    empDict = {}
+    gallery = Gallery.query.filter(Gallery.id == person_id).first()
+    if gallery:
+        empDict = {
+            'id': gallery.id,
+            'name': gallery.name,
+            'path': "http://localhost:5000/" + gallery.path,
+            'subject_gallery': gallery.subject_gallery,
+            'images': getImagesForPerson(gallery.images),
+            'avatar': gallery.images.first().path
+        }
+    return jsonify(empDict), 201
 
 @app.route("/api/tasks/")
 def task_overview():

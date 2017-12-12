@@ -10,6 +10,7 @@ class Image(db.Model):
     __tablename__ = 'image'
 
     id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey('event.id'))
     name = db.Column(db.String(255))
     gallery_id = db.Column(db.Integer, db.ForeignKey('gallery.id'))
     path = db.Column(db.String())
@@ -23,8 +24,9 @@ class Image(db.Model):
         path_components = self.path.split(os.sep)
         return '/'.join(path_components)
 
-    def __init__(self, name, path, gallery_id=None):
+    def __init__(self, name, path, event_id, gallery_id=None):
         self.name = name
         self.path = path
+        self.event_id = event_id
         self.gallery_id = gallery_id
         self.createdate = datetime.datetime.now()

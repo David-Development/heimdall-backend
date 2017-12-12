@@ -3,7 +3,7 @@ import shutil
 from urllib.request import urlopen
 import bz2
 import time
-import datetime
+from datetime import datetime, timedelta
 import multiprocessing
 import base64
 import gc
@@ -22,6 +22,7 @@ from heimdall.models.Gallery import Gallery
 from heimdall.models.Image import Image
 from heimdall.models.ClassifierStats import ClassifierStats
 from heimdall.models.Labels import Labels
+from heimdall.models.Event import Event
 from heimdall.models.ClassificationResults import ClassificationResults
 
 from heimdall.recognition import utils, augmenter
@@ -59,6 +60,13 @@ def create_and_populate_gallery(base_path, gallery_name, subject_gallery=True):
     :param subject_gallery: indicates the gallery contains images from a single person (True) or not (False)
     :return: 
     """
+
+    event = Event.query.first()
+    if event is None:
+        event = Event()
+        db.session.add(event)
+        db.session.commit()
+
     gallery_path = os.path.join(base_path, gallery_name)
 
     if subject_gallery:
@@ -72,7 +80,7 @@ def create_and_populate_gallery(base_path, gallery_name, subject_gallery=True):
     for file_path in os.listdir(gallery_path):
         _, ext = os.path.splitext(file_path)
         if str(ext).lower() in ['.png', '.jpg', '.jpeg']:
-            db.session.add(Image(name=file_path, gallery_id=gallery.id, path=os.path.join(gallery_folder, file_path)))
+            db.session.add(Image(name=file_path, event_id=event.id, gallery_id=gallery.id, path=os.path.join(gallery_folder, file_path)))
     db.session.commit()
 
 
@@ -86,9 +94,23 @@ def new_image(image, filename):
     path = os.path.join(config['NEW_IMAGES_PATH'], filename)
     new_gallery = Gallery.query.filter_by(name='new').first()
 
+    event_time_frame = datetime.now() - timedelta(minutes=1)
+    print("event_time_frame:", event_time_frame)
+    event = Event.query.filter(Event.begindate>=event_time_frame).first()
+
+    if event is None:
+        print("No matching event found.. creating new one..")
+        event = Event()
+        db.session.add(event)
+        db.session.commit()
+    else:
+        print("Found matching event!")
+
+    print("Using event:", event.begindate)
+
     with open(path, 'wb') as f:
         f.write(base64.b64decode(image))
-    image = Image(name=filename, gallery_id=new_gallery.id, path=os.path.join(config['NEW_IMAGES_FOLDER'], filename))
+    image = Image(name=filename, event_id=event.id, gallery_id=new_gallery.id, path=os.path.join(config['NEW_IMAGES_FOLDER'], filename))
     db.session.add(image)
     db.session.commit()
 
@@ -379,7 +401,7 @@ class TrainRecognizer:
         plt.savefig(learning_curve_path, bbox_inches='tight')
 
         stats = ClassifierStats(name=clf_type + timestamp, classifier_type=clf_type, model_path=path,
-                                date=datetime.datetime.now(), cv_score=cv_score, total_images=total_images,
+                                date=datetime.now(), cv_score=cv_score, total_images=total_images,
                                 total_no_face=no_face, training_time=training_time, avg_base_img=avg_images,
                                 num_classes=len(folder_names), confusion_matrix=confusion_path,
                                 learning_curve=learning_curve_path)
