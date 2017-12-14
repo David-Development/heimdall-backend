@@ -6,8 +6,10 @@ import time
 import urllib.error
 import socket
 
+#RTSP_HOST_IP = '192.168.10.48'
+RTSP_HOST_IP = '10.20.146.26'
+
 HEIMDALL_HOST = 'http://heimdall'
-#HEIMDALL_HOST = 'http://heimdall_heimdall_1'
 HEIMDALL_PORT = 5000
 frame_count = 0
 start = False
@@ -17,7 +19,7 @@ time.sleep(12)
 print("Okay, let's go!")
 
 if start:
-    vcap = cv2.VideoCapture("rtsp://192.168.10.48:8554/unicast")
+    vcap = cv2.VideoCapture("rtsp://{}:8554/unicast".format(RTSP_HOST_IP)
 
     while True:
         ret, frame = vcap.read()
