@@ -402,7 +402,7 @@ class TrainRecognizer:
 
         stats = ClassifierStats(name=clf_type + timestamp, classifier_type=clf_type, model_path=path,
                                 date=datetime.now(), cv_score=cv_score, total_images=total_images,
-                                total_no_face=no_face, training_time=training_time, avg_base_img=avg_images,
+                                total_no_faces=no_face, training_time=training_time, avg_base_img=avg_images,
                                 num_classes=len(folder_names), confusion_matrix=confusion_path,
                                 learning_curve=learning_curve_path)
         db.session.add(stats)

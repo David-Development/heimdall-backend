@@ -29,7 +29,7 @@ class ClassifierStats(db.Model):
     # average number of images per class
     avg_base_img = db.Column(db.Float)
     # total number of images with no faces found (including augmented images)
-    total_no_face = db.Column(db.Integer)
+    total_no_faces = db.Column(db.Integer)
     # total training time, consisting of time for augmentation, feature extraction and classifier training, in seconds
     training_time = db.Column(db.Integer)
     # is model currently loaded/used
@@ -40,7 +40,7 @@ class ClassifierStats(db.Model):
     learning_curve = db.Column(db.String())
 
     def __init__(self, name, classifier_type, model_path, date, num_classes, cv_score=None, total_images=None,
-                 avg_base_img=None, total_no_face=None, training_time=None, confusion_matrix=None, learning_curve=None):
+                 avg_base_img=None, total_no_faces=None, training_time=None, confusion_matrix=None, learning_curve=None):
         self.name = name
         self.classifier_type = classifier_type
         self.model_path = model_path
@@ -49,7 +49,7 @@ class ClassifierStats(db.Model):
         self.cv_score = cv_score
         self.total_images = total_images
         self.avg_base_img = avg_base_img
-        self.total_no_face = total_no_face
+        self.total_no_faces = total_no_faces
         self.training_time = training_time
         self.confusion_matrix = confusion_matrix
         self.learning_curve = learning_curve
