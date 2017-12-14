@@ -18,4 +18,4 @@ matplotlib==2.1.0
 scikit-plot==0.3.3
 psycopg2==2.7.3.2
 augmentor==0.1.8
-flask-mqtt==0.0.9
+gunicorn==19.7.1

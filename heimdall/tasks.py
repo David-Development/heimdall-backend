@@ -17,7 +17,7 @@ from sklearn.externals import joblib
 import numpy as np
 import cv2
 
-from heimdall.app import db, recognizer, clf, redis, app
+from heimdall.app import db, recognizer, clf, redis, app, mqtt
 from heimdall.models.Gallery import Gallery
 from heimdall.models.Image import Image
 from heimdall.models.ClassifierStats import ClassifierStats
@@ -96,7 +96,7 @@ def new_image(image, filename):
 
     event_time_frame = datetime.now() - timedelta(minutes=1)
     print("event_time_frame:", event_time_frame)
-    event = Event.query.filter(Event.begindate>=event_time_frame).first()
+    event = Event.query.filter(Event.begindate >= event_time_frame).first()
 
     if event is None:
         print("No matching event found.. creating new one..")
@@ -287,6 +287,7 @@ def models_exist():
 
 
 from multiprocessing import Process
+from threading import Thread
 import random
 
 class TrainRecognizer:
@@ -304,7 +305,8 @@ class TrainRecognizer:
     def run(self):
         self.update_status('IDLE', {})
 
-        p = Process(target=self.train_recognizer)
+        #p = Process(target=self.train_recognizer) # If we use the Process here, we can't use the mqtt publish below!
+        p = Thread(target=self.train_recognizer)
         # p = Process(target=self.train_recognizer, args=(taskid,))
         p.daemon = True
         p.start()
@@ -313,9 +315,13 @@ class TrainRecognizer:
 
     def update_status(self, state, meta):
         content = json.dumps({'task_id': self.task_id, 'status': {'state': state, 'meta': meta}})
-        print("Content:", content)
+        # print("Content:", content)
         # redis.hset("train_recognizer", self.task_id, content)
         # redis.hmset("train_recognizer", content)
+
+        # print("mqtt publish")
+        mqtt.publish("heimdall/status/training", payload=content, qos=0, retain=True)
+
         redis.set("train_recognizer", content)
 
     def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
@@ -330,12 +336,14 @@ class TrainRecognizer:
         :return:
         """
 
+        self.update_status('STARTED', {'step': 'Processing images'})
+
         classifier = create_classifier(clf_type, n_jobs, k)
         X, y, folder_names = utils.load_dataset(config['SUBJECTS_BASE_PATH'], grayscale=False)
         avg_images = np.mean(np.unique(y, return_counts=True)[1])
 
         start = time.time()
-        #X, y = self.augment_images(X, y, target=config['NUM_TARGET_IMAGES'])
+        # X, y = self.augment_images(X, y, target=config['NUM_TARGET_IMAGES'])
         X, y = self.augment_images(X, y, folder_names, target=config['NUM_TARGET_IMAGES'])
 
         label_dict = utils.create_label_dict(y, folder_names)
@@ -363,8 +371,8 @@ class TrainRecognizer:
                     transformed.append(descriptor)
                     labels.append(label)
 
-                #imgOutput = cv2.cvtColor(image, cv2.COLOR_RGB2BGR) # convert colors back
-                #cv2.imwrite("./images_for_debugging/face_" + str(i) + ".jpg", imgOutput)
+                # imgOutput = cv2.cvtColor(image, cv2.COLOR_RGB2BGR) # convert colors back
+                # cv2.imwrite("./images_for_debugging/face_" + str(i) + ".jpg", imgOutput)
             else:
                 print("No face at position:", i)
                 print("Label:", label)
@@ -418,7 +426,7 @@ class TrainRecognizer:
 
         with app.app_context():
             if config['DOCKER']:
-                url = "http://heimdall:5000/api/classifier/load/"
+                url = "http://127.0.0.1:5000/api/classifier/load/"
             else:
                 url = url_for('load_new_classifier', _external=True)
             requests.post(url)
@@ -427,9 +435,11 @@ class TrainRecognizer:
         gc.collect()
 
         content = {'task_id': self.task_id, 'status': 'FINISHED'}
+
+        redis.delete("train_recognizer")
         redis.hmset("train_recognizer", content)
 
-        #r.delete("train_recognizer")
+        self.update_status('FINISHED', {'step': ''})
 
         return {'current': total_images, 'total': total_images, 'step': 'Training',
                 'result': 'Training finished'}

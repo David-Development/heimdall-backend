@@ -2,15 +2,18 @@ import os
 import glob
 import datetime
 import json
+import time
 
 import binascii
 from flask_restful import Resource, reqparse, marshal_with, fields, abort
+from flask_restful.utils import cors
 from sqlalchemy.exc import IntegrityError
 from flask import jsonify, send_from_directory, request, url_for, render_template, json, Response, abort
-from io import BytesIO
-from PIL import Image as PILImage
 import numpy as np
 import requests
+from io import BytesIO
+from PIL import Image as PILImage
+
 from heimdall.models.Gallery import Gallery
 from heimdall.models.Image import Image
 from heimdall.models.Event import Event
@@ -18,9 +21,10 @@ from heimdall.models.ClassifierStats import ClassifierStats
 from heimdall.models.ClassificationResults import ClassificationResults
 from heimdall.models.RecognitionResult import RecognitionResult
 
+from heimdall.camera.camera import Camera
 from heimdall.app import api, app, db, recognizer, clf, labels, redis, mqtt
 from heimdall.recognition import utils
-from heimdall.recognition.RecognitionManager import recognition_manager
+from heimdall.recognition.RecognitionManager import recognition_manager, last_recognized_annotated_image
 from heimdall.tasks import (sync_db_from_filesystem, delete_gallery, move_images, download_models, models_exist,
                             TrainRecognizer, load_classifier, new_image, clear_gallery)
 
@@ -176,21 +180,27 @@ class GalleryListRes(Resource):
 
 
 class ImageListRes(Resource):
+
     @marshal_with(image_fields)
     def get(self):
         return Image.query.all()
 
+    @cors.crossdomain(origin='*') # TODO remove cors header here...
     def put(self):
         """
         Move Images from one Gallery to another
         :return: 
         """
         parsed_args = image_parser.parse_args()
+        print(parsed_args)
         gallery_id = parsed_args['gallery_id']
         image_ids = parsed_args['image_ids']
 
         gallery = Gallery.query.filter_by(id=gallery_id).first()
         images = Image.query.filter(Image.id.in_(image_ids)).all()
+
+        print(gallery)
+        print(images)
 
         # move on filesystem
         move_images(gallery, images)
@@ -202,7 +212,7 @@ class ImageListRes(Resource):
 
         db.session.commit()
 
-        return {'message': 'images moved'}, 200
+        return jsonify({'message': 'images moved'}), 200
 
 
 class GalleryImagesListRes(Resource):
@@ -273,22 +283,24 @@ def getDetectionResults(image_id):
     detectionList = []
     for classif in ClassificationResults.query.filter(ClassificationResults.image_id == image_id).all():
         res = classif.results.first()
-        empDict = {
-            #'id': classif.id,
-            'id': res.gallery_id,
-            'location': [res.x, res.y, res.w, res.h]
-        }
-        detectionList.append(empDict)
+        if res:
+            empDict = {
+                #'id': classif.id,
+                'id': res.gallery_id,
+                'location': [res.x, res.y, res.w, res.h]
+            }
+            detectionList.append(empDict)
     #print(detectionList)
     return detectionList
 
 def getImagesForEvent(event_id):
     imageList = []
-    for image in Image.query.filter(Image.event_id == event_id).limit(5).all():
+    for image in Image.query.filter(Image.event_id == event_id).order_by(Image.createdate.desc()).limit(5).all():
         empDict = {
             'id': image.id,
-            'url': "http://localhost:5000/" + image.path,
-            'detected': getDetectionResults(image.id)
+            'url': image.path,
+            'detected': getDetectionResults(image.id),
+            'user_id': image.gallery_id
         }
         imageList.append(empDict)
     return imageList
@@ -296,7 +308,7 @@ def getImagesForEvent(event_id):
 @app.route("/events/", methods=['GET'])
 def getEvents():
     eventList = []
-    for event in Event.query.order_by(Event.begindate).all():
+    for event in Event.query.order_by(Event.begindate.desc()).all():
         empDict = {
             'id': event.id,
             'date': event.begindate.date().isoformat(),
@@ -312,15 +324,18 @@ def getEvents():
 @app.route("/persons/", methods=['GET'])
 def getPersons():
     galleryList = []
-    for gallery in Gallery.query.filter(Gallery.name != "unkown").all():
+    #for gallery in Gallery.query.filter(Gallery.name != "unkown").all():
+    for gallery in Gallery.query.order_by(Gallery.name).all():
         empDict = {
             'id': gallery.id,
             'name': gallery.name,
-            'path': "http://localhost:5000/" + gallery.path,
+            'path': gallery.path,
             'subject_gallery': gallery.subject_gallery,
-            'images': gallery.images.count(),
-            'avatar': gallery.images.first().path
+            'images': gallery.images.count()
         }
+
+        avatar = gallery.images.first()
+        empDict['avatar'] = avatar.path if avatar else ""
 
         galleryList.append(empDict)
 
@@ -332,7 +347,7 @@ def getImagesForPerson(query):
     for image in query.all():
         empDict = {
             'id': image.id,
-            'path': "http://localhost:5000/" + image.path
+            'path': image.path
         }
         imageList.append(empDict)
     return imageList
@@ -345,7 +360,7 @@ def getPersonById(person_id):
         empDict = {
             'id': gallery.id,
             'name': gallery.name,
-            'path': "http://localhost:5000/" + gallery.path,
+            'path': gallery.path,
             'subject_gallery': gallery.subject_gallery,
             'images': getImagesForPerson(gallery.images),
             'avatar': gallery.images.first().path
@@ -393,7 +408,31 @@ def task_overview():
 def models():
     return render_template('models.html', models=ClassifierStats.query.order_by(ClassifierStats.loaded.desc(),
                                                                                 ClassifierStats.date.desc()).all())
+'''
+def getModels():
+    classifierList = []
+    for classifier in ClassifierStats.query.order_by(ClassifierStats.loaded.desc(), ClassifierStats.date.desc()).all():
+        empDict = {
+            'id': classifier.id,
+            'classifier_type': classifier.classifier_type,
+            'model_path': classifier.model_path,
+            'date': classifier.date,
+            'num_classes': classifier.num_classes,
+            'cv_score': classifier.cv_score,
+            'total_images': classifier.total_images,
+            'avg_base_img': classifier.avg_base_img,
+            'total_no_faces': classifier.total_no_faces,
+            'training_time': classifier.training_time,
+            'confusion_matrix': classifier.confusion_matrix,
+            'learning_curve': classifier.learning_curve,
+        }
+        classifierList.append(empDict)
+    return classifierList
 
+@app.route("/api/models")
+def get_models():
+    return jsonify(getModels()), 201
+'''
 
 @app.route("/api/resync")
 def resync_db():
@@ -511,35 +550,15 @@ def new_live_image():
 
     parsed_args = live_parser.parse_args()
     image = parsed_args['image']
-    annotate = True
-    if parsed_args['annotate'] is not None:
-        if parsed_args['annotate'] == u'False':
-            annotate = False
     filename = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')[:-3]) + '.jpg'
     id = new_image(image, filename)
 
     latest_clf = ClassifierStats.query.order_by(ClassifierStats.date.desc()).first()
     if latest_clf:
-        #result = classify_db_image(id)
-
         recognition_manager.add_image(id)
-
-        #with heimdall.app_context():
-        #    url = url_for('classify_db_image', image_id=id, _external=True)
-        #r = requests.get(url)
-        #result = redis.json()
-        #if len(result['predictions']) > 0 and annotate:
-        #    image = annotate_live_image(image, result)
-
-        #print(result)
-
-        #socketio.emit('new_image', json.dumps({'image': image,
-        #                                    'image_id': id,
-        #                                    'classification': result}))
         return jsonify({'message': 'Image processed'}), 200
     else:
         return jsonify({'message': 'No classifier present!'}), 500
-
 
 
 @app.route("/api/recognizer/train/status")
@@ -550,6 +569,7 @@ def recognizer_training_status():
 @app.route("/api/classifier/")
 def get_classifier():
     return jsonify(ClassifierStats.query.order_by(ClassifierStats.loaded.desc(), ClassifierStats.date.desc()).all()), 200
+
 
 @app.route("/api/classifier/load/", methods=['POST'])
 def load_new_classifier():

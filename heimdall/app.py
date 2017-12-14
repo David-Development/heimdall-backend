@@ -4,14 +4,14 @@ import os
 import redis as red
 import eventlet
 from flask import Flask
-from flask_mqtt import Mqtt
+from flask_mqtt.flask_mqtt import Mqtt
 from flask_restful import Api
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 
 from heimdall.settings import DockerConfig
 
-eventlet.monkey_patch()
+#eventlet.monkey_patch()
 
 
 clf = None   # TODO check if this can be deleted
@@ -27,7 +27,7 @@ recognizer = None
 app = None
 
 
-def create_app(config_object=DockerConfig, main=True):
+def create_app(config_object=DockerConfig):
     global db
     global mqtt
     global api
@@ -69,6 +69,4 @@ def create_app(config_object=DockerConfig, main=True):
     RecognitionManager.init(app, db)
 
     return app
-
-
 

@@ -9,10 +9,14 @@ import traceback
 import json
 
 from heimdall.app import mqtt
+from heimdall.camera.camera import Camera
+
+import threading
+lock = threading.Lock()
 
 app = None
 db = None
-
+last_recognized_annotated_image = None
 
 '''
 print("RecognitionManager __init__ called!")
@@ -88,11 +92,12 @@ class RecognitionManager:
             print("Error: cannot connect to redis server. Is the server running?")
             sys.exit(1)
 
+    # The method below will be called on the *****PoolExecutor
     @staticmethod
     def process_image(data):
         try:
-            print("Job started!")
             redis, image_id = data[0]
+            print("Job started! Image-ID:", image_id)
             # print("------------")
             # print("App: ", heimdall)
             # print("DB: ", db)
@@ -123,7 +128,7 @@ class RecognitionManager:
             #                                       'classification': result}))
 
             #print("Result: ", result)
-            result["img_path"] = "http://localhost:5000/" + db_image.path
+            result["img_path"] = db_image.path
             result = json.dumps(result)
 
             mqtt.publish("recognitions/person", payload=result, qos=0, retain=True)
@@ -132,16 +137,15 @@ class RecognitionManager:
             redis.rpush("test", result)
         except Exception as e:
             print("Exception: ", e)
+            print(traceback.format_exc())
 
     def add_image(self, image_id):
-        print("Scheduling!")
+        print("Scheduling process_image!")
+        print("Image-ID:", image_id)
 
-        #print(heimdall)
-        #print(socketio)
-        #print(db)
-        print(image_id)
+        RecognitionManager.process_image([(self.redis, image_id)])
 
-        self.executor.submit(RecognitionManager.process_image, [(self.redis, image_id)])
+        #self.executor.submit(RecognitionManager.process_image, [(self.redis, image_id)])
         # print(redis_threading.lrange("test", 0, -1))
 
     def test(self):
@@ -201,6 +205,10 @@ def classify_db_image(db_image_id, image):
     diff = time_after_classification - time_before_classification
 
     latest_clf = ClassifierStats.query.order_by(ClassifierStats.date.desc()).first()
+
+    if not latest_clf:
+        raise ValueError('No model trained yet!')
+
     classification_result = ClassificationResults(clf_id=latest_clf.id, image_id=db_image_id,
                                                   date=datetime.datetime.now())
     db.session.add(classification_result)
@@ -214,13 +222,13 @@ def classify_db_image(db_image_id, image):
         prob = np.max(faces)
 
         # If the probability is less then the configures threshold, the person is unknown
-        if prob < app.config['PROBABILITY_THRESHOLD']:
-            label = 'unknown'
-        else:
+        label = "unknown"
+        if prob >= app.config['PROBABILITY_THRESHOLD']:
             label = app.labels[highest]
-        gallery = Gallery.query.filter_by(name=label).first()
-        db.session.add(
-            RecognitionResult(classification=classification_result.id, gallery_id=gallery.id, probability=prob, bounding_box=bb))
+        gallery = Gallery.query.filter(Gallery.name == label).first()
+        print("Label:", label)
+        print("Gallery:", gallery)
+        db.session.add(RecognitionResult(classification=classification_result.id, gallery_id=gallery.id, probability=prob, bounding_box=bb))
         prediction_dict = {}
         prediction_result_dict = {'highest': label,
                                   'bounding_box': bb,

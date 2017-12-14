@@ -10,8 +10,11 @@ class Config(object):
     BASEDIR = os.path.abspath(os.path.dirname(__file__)) # TODO rename to APP_DIR
 
     # MQTT Setup
+    MQTT_CLIENT_ID = 'heimdall-backend'
     MQTT_BROKER_URL = 'mqtt-broker'
     MQTT_BROKER_PORT = 1883
+    #MQTT_BROKER_PORT = 8083
+    #MQTT_BROKER_TRANSPORT = 'websockets'
     MQTT_USERNAME = ''
     MQTT_PASSWORD = ''
     MQTT_REFRESH_TIME = 1.0  # refresh time in seconds
