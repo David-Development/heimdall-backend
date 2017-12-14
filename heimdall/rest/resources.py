@@ -352,6 +352,28 @@ def getPersonById(person_id):
         }
     return jsonify(empDict), 201
 
+
+def get_mjpeg_image(frame):
+    return (b'--frame\r\n'
+            b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+
+
+def gen(camera):
+    """Video streaming generator function."""
+    frame = camera.get_frame(wait=False)  # allow fast start
+    if frame:  # send image twice... otherwise chrome won't display it...
+        yield get_mjpeg_image(frame) +  get_mjpeg_image(frame)
+
+    while True:
+        frame = camera.get_frame()
+        yield get_mjpeg_image(frame) + get_mjpeg_image(frame)
+
+
+@app.route('/video_feed')
+def video_feed():
+    return Response(gen(Camera()), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+
 @app.route("/api/tasks/")
 def task_overview():
     tasks = {}

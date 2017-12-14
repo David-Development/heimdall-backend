@@ -111,8 +111,11 @@ class RecognitionManager:
             if len(result['predictions']) > 0 and annotate:
                 image = annotate_live_image(image, result)
 
+
+
             # print("Image Path: ", image_path)
-            # cv2.imwrite('/heimdall/heimdall/images/new/test.jpg', image)
+            cv2.imwrite('/live_view.jpg', image)
+            Camera.currentImage = Camera.load_image('/live_view.jpg')
 
             # TODO mqtt new image
             #socketio.emit('new_image', json.dumps({'image': image_to_base64(image),

@@ -22,6 +22,7 @@ def run():
     app.run(host='0.0.0.0',
             port=5000,
             use_reloader=False,
+            threaded=True,  # otherwise only one client can connect to mjpeg stream
             debug=True)
 
 
