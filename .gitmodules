@@ -1,0 +1,3 @@
+[submodule "flask_mqtt"]
+	path = flask_mqtt
+	url = https://github.com/David-Development/Flask-MQTT.git
