@@ -336,15 +336,18 @@ class TrainRecognizer:
         :return:
         """
 
-        self.update_status('STARTED', {'step': 'Processing images'})
-
         classifier = create_classifier(clf_type, n_jobs, k)
         X, y, folder_names = utils.load_dataset(config['SUBJECTS_BASE_PATH'], grayscale=False)
         avg_images = np.mean(np.unique(y, return_counts=True)[1])
 
+        current_step = 0
+        total_steps = (len(folder_names) * config['NUM_TARGET_IMAGES']) + len(folder_names) # len(folder_names) for augmentation
+        self.update_status('STARTED', {'step': current_step, 'total_steps': total_steps, 'description': ''})
+
         start = time.time()
         # X, y = self.augment_images(X, y, target=config['NUM_TARGET_IMAGES'])
-        X, y = self.augment_images(X, y, folder_names, target=config['NUM_TARGET_IMAGES'])
+        X, y = self.augment_images(X, y, folder_names=folder_names, target=config['NUM_TARGET_IMAGES'], current_step=current_step, total_steps=total_steps)
+        current_step = len(folder_names)  # set current step to the number of augmented folders
 
         label_dict = utils.create_label_dict(y, folder_names)
         total_images = len(y)
@@ -363,8 +366,9 @@ class TrainRecognizer:
         for data in zip(X, y):
             image = data[0]
             label = data[1]
-            i += 1
-            self.update_status('STARTED', {'current': i, 'total': total_images, 'step': 'Transforming'})
+            current_step += 1
+
+            self.update_status('STARTED', {'step': current_step, 'total_steps': total_steps, 'description': 'Transforming'})
             descriptors, _ = recognizer.extract_descriptors(image)
             if len(descriptors) != 0:
                 for descriptor in descriptors:
@@ -374,18 +378,16 @@ class TrainRecognizer:
                 # imgOutput = cv2.cvtColor(image, cv2.COLOR_RGB2BGR) # convert colors back
                 # cv2.imwrite("./images_for_debugging/face_" + str(i) + ".jpg", imgOutput)
             else:
-                print("No face at position:", i)
                 print("Label:", label)
                 no_face += 1
 
-                imgOutput = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)  # convert colors back
-                cv2.imwrite("./images_for_debugging/no_face_" + str(i) + ".jpg", imgOutput)
+                img_output = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)  # convert colors back
+                cv2.imwrite("./images_for_debugging/no_face_" + str(i) + ".jpg", img_output)
 
         if cross_val:
-            self.update_status('STARTED', {'current': total_images, 'total': total_images,'step': 'Scoring'})
+            self.update_status('STARTED', {'step': current_step, 'total_steps': total_steps, 'description': 'Scoring'})
             cv_score = np.mean(cross_val_score(classifier, transformed, labels, cv=5, n_jobs=n_jobs))
-
-            self.update_status('STARTED',{'current': total_images, 'total': total_images,'step': 'Training'})
+            self.update_status('STARTED', {'step': current_step, 'total_steps': total_steps, 'description': 'Training'})
         classifier.fit(transformed, labels)
 
         print("Labels after zip:", np.unique(labels))
@@ -444,7 +446,7 @@ class TrainRecognizer:
         return {'current': total_images, 'total': total_images, 'step': 'Training',
                 'result': 'Training finished'}
 
-    def augment_images(self, images, labels, folder_names, target):
+    def augment_images(self, images, labels, folder_names, target, current_step, total_steps):
         """
         Augments the images up to a certain number
         :param images: Images to augment
@@ -477,8 +479,11 @@ class TrainRecognizer:
             print("Gallery:", folder_name)
 
             number_of_missing_images = target - len(indices)
-            self.update_status('STARTED', {'current': int(unique_class + 1), 'total': len(unique_class_indices),
-                                  'step': 'Augmenting'})
+
+            current_step += 1
+            self.update_status('STARTED', {'step': current_step,
+                                           'total_steps': total_steps,
+                                           'description': 'Augmenting'})
 
             print("Number of missing Images: ", number_of_missing_images)
             batch_x = augmenter.augment_array_target(folder_name, number_of_missing_images)
