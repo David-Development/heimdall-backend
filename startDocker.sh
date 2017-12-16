@@ -1,8 +1,5 @@
 #!/bin/bash
 
-
-setup_file="/setup_done"
-
 python="python3" # "python3" or "python"
 
 export PYTHONUNBUFFERED=TRUE
@@ -11,6 +8,26 @@ set DISPLAY :0
 
 $python flask_mqtt/setup.py install
 
+
+models_file="./heimdall/ml_models/dlib_face_recognition_resnet_model_v1.dat"
+if [ -f "$models_file" ]
+then
+    echo "$models_file exists! Skipping initialization.."
+else
+    echo "$models_file not found.. Downloading models.. Please wait.."
+    cd ./heimdall/ml_models
+    wget https://github.com/davisking/dlib-models/raw/master/dlib_face_recognition_resnet_model_v1.dat.bz2
+    wget https://github.com/davisking/dlib-models/raw/master/shape_predictor_68_face_landmarks.dat.bz2
+    bunzip2 dlib_face_recognition_resnet_model_v1.dat.bz2 # unzip
+    bunzip2 shape_predictor_68_face_landmarks.dat.bz2     # unzip
+    rm dlib_face_recognition_resnet_model_v1.dat.bz2 # cleanup
+    rm shape_predictor_68_face_landmarks.dat.bz2     # cleanup
+    cd ../../
+    echo "##################################################"
+    
+fi
+
+setup_file="/setup_done"
 if [ -f "$setup_file" ]
 then
     echo "$setup_file exists! Skipping initialization.."
