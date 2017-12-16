@@ -132,7 +132,7 @@ class RecognitionManager:
             result = json.dumps(result)
 
             mqtt.publish("recognitions/person", payload=result, qos=0, retain=True)
-            #mqtt.publish("recognitions/image", payload=image_to_base64(image), qos=0, retain=True)
+            mqtt.publish("recognitions/image", payload=image_to_base64(image), qos=0, retain=True)
 
             redis.rpush("test", result)
         except Exception as e:
