@@ -295,7 +295,15 @@ def getDetectionResults(image_id):
 
 def getImagesForEvent(event_id):
     imageList = []
-    for image in Image.query.filter(Image.event_id == event_id).order_by(Image.createdate.desc()).limit(5).all():
+
+    #gallery_new_id = Gallery.query.filter(Gallery.name == 'new').first().id
+
+    # TODO The RecognitionResult GalleryID is relevant.. check if recognitionresult.galleryid != new_id
+    for image in Image.query \
+            .filter(Image.event_id == event_id) \
+            .order_by(Image.createdate.desc()).limit(5).all():
+            #.filter(Image.event_id == event_id, Image.gallery_id != gallery_new_id)\
+
         empDict = {
             'id': image.id,
             'url': image.path,
