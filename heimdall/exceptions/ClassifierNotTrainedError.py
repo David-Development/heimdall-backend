@@ -1,0 +1,2 @@
+class ClassifierNotTrainedError(Exception):
+    pass

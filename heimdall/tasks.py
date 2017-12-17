@@ -25,6 +25,8 @@ from heimdall.models.Labels import Labels
 from heimdall.models.Event import Event
 from heimdall.models.ClassificationResults import ClassificationResults
 
+from heimdall.exceptions.ClassifierNotTrainedError import ClassifierNotTrainedError
+
 from heimdall.recognition import utils, augmenter
 
 import scikitplot
@@ -305,8 +307,8 @@ class TrainRecognizer:
     def run(self):
         self.update_status('IDLE', {})
 
-        #p = Process(target=self.train_recognizer) # If we use the Process here, we can't use the mqtt publish below!
-        p = Thread(target=self.train_recognizer)
+        #p = Process(target=self.train_recognizer_with_error_handling) # If we use the Process here, we can't use the mqtt publish below!
+        p = Thread(target=self.train_recognizer_with_error_handling)
         # p = Process(target=self.train_recognizer, args=(taskid,))
         p.daemon = True
         p.start()
@@ -323,6 +325,16 @@ class TrainRecognizer:
         mqtt.publish("heimdall/status/training", payload=content, qos=0, retain=True)
 
         redis.set("train_recognizer", content)
+
+    def train_recognizer_with_error_handling(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
+        try:
+            self.train_recognizer(clf_type=clf_type, n_jobs=n_jobs, k=k, cross_val=cross_val)
+        except ClassifierNotTrainedError as e:
+            self.update_status('EXCEPTION', {'step': 0, 'total_steps': 1, 'description': 'Fehler: ' + str(e)})
+            print(e)
+            time.sleep(10)  # show this exception to the clients for a few seconds.. todo find better solution for this
+        finally:
+            self.update_status('FINISHED', {'step': ''})
 
     def train_recognizer(self, clf_type="SVM", n_jobs=-1, k=5, cross_val=True):
         """
@@ -356,6 +368,9 @@ class TrainRecognizer:
         cv_score = None
         transformed = []
         labels = []
+
+        if len(label_dict) < 2:  # we need at least two persons
+            raise ClassifierNotTrainedError("At least two faces are required to train the network!")
 
         print("_______________________________")
         print("Num of Pictures:", len(X))
@@ -440,8 +455,6 @@ class TrainRecognizer:
 
         redis.delete("train_recognizer")
         redis.hmset("train_recognizer", content)
-
-        self.update_status('FINISHED', {'step': ''})
 
         return {'current': total_images, 'total': total_images, 'step': 'Training',
                 'result': 'Training finished'}

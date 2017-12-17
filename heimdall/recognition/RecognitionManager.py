@@ -5,11 +5,13 @@ import redis
 import concurrent.futures
 import multiprocessing
 
+
 import traceback
 import json
 
 from heimdall.app import mqtt
 from heimdall.camera.camera import Camera
+from heimdall.exceptions.ClassifierNotTrainedError import ClassifierNotTrainedError
 
 import threading
 lock = threading.Lock()
@@ -95,49 +97,45 @@ class RecognitionManager:
     # The method below will be called on the *****PoolExecutor
     @staticmethod
     def process_image(data):
+        redis, image_id = data[0]
+        print("Job started! Image-ID:", image_id)
+        # print("------------")
+        # print("App: ", heimdall)
+        # print("DB: ", db)
+        # print("Config: ", config)
+        # print("Image id:", image_id)
+        # print("Image: ", image[:10])
+        # print("------------")
+
+        db_image = Image.query.filter_by(id=image_id).first()
+        image_path = os.path.join(app.config['BASEDIR'], db_image.path)
+        image = utils.load_image(image_path)
+
         try:
-            redis, image_id = data[0]
-            print("Job started! Image-ID:", image_id)
-            # print("------------")
-            # print("App: ", heimdall)
-            # print("DB: ", db)
-            # print("Config: ", config)
-            # print("Image id:", image_id)
-            # print("Image: ", image[:10])
-            # print("------------")
-
-            db_image = Image.query.filter_by(id=image_id).first()
-            image_path = os.path.join(app.config['BASEDIR'], db_image.path)
-            image = utils.load_image(image_path)
-
             result = classify_db_image(db_image.id, image)
 
             annotate = True
             if len(result['predictions']) > 0 and annotate:
                 image = annotate_live_image(image, result)
 
-
-
-            # print("Image Path: ", image_path)
-            cv2.imwrite('/live_view.jpg', image)
-            Camera.currentImage = Camera.load_image('/live_view.jpg')
-
-            # TODO mqtt new image
-            #socketio.emit('new_image', json.dumps({'image': image_to_base64(image),
-            #                                       'image_id': image_id,
-            #                                       'classification': result}))
-
-            #print("Result: ", result)
+            # print("Result: ", result)
             result["img_path"] = db_image.path
             result = json.dumps(result)
 
             mqtt.publish("recognitions/person", payload=result, qos=0, retain=True)
-            mqtt.publish("recognitions/image", payload=image_to_base64(image), qos=0, retain=True)
 
             redis.rpush("test", result)
+        except ClassifierNotTrainedError:
+            print("Classifier is not trained yet!")
         except Exception as e:
             print("Exception: ", e)
             print(traceback.format_exc())
+        finally:
+            # send image to the live view
+            mqtt.publish("recognitions/image", payload=image_to_base64(image), qos=0, retain=True)
+
+            cv2.imwrite('/live_view.jpg', image)
+            Camera.currentImage = Camera.load_image('/live_view.jpg')
 
     def add_image(self, image_id):
         print("Scheduling process_image!")
@@ -207,7 +205,7 @@ def classify_db_image(db_image_id, image):
     latest_clf = ClassifierStats.query.order_by(ClassifierStats.date.desc()).first()
 
     if not latest_clf:
-        raise ValueError('No model trained yet!')
+        raise ClassifierNotTrainedError('No model trained yet!')
 
     classification_result = ClassificationResults(clf_id=latest_clf.id, image_id=db_image_id,
                                                   date=datetime.datetime.now())
@@ -270,7 +268,7 @@ def annotate_live_image(image, classification_result):
             text = name
             color = (0, 0, 255)
         else:
-            text = name + ': ' + str(round(prob, 2))
+            text = name + ': ' + str(int(round(prob*100))) + '%'
             color = (0, 255, 0)
         image = cv2.rectangle(image, pt1=(bb[0], bb[1]), pt2=(bb[0] + bb[2], bb[1] + bb[3]), color=color, thickness=1)
         image = cv2.putText(image, text, (bb[0], bb[1] + bb[3] + 30),
