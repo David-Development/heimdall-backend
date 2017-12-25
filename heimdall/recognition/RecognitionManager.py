@@ -112,30 +112,44 @@ class RecognitionManager:
         image = utils.load_image(image_path)
 
         try:
+            if image is None:
+                raise AssertionError('Image was None / empty')
+
             result = classify_db_image(db_image.id, image)
 
             annotate = True
-            if len(result['predictions']) > 0 and annotate:
-                image = annotate_live_image(image, result)
+            if len(result['predictions']) > 0:
+                if annotate:
+                    image = annotate_live_image(image, result)
 
-            # print("Result: ", result)
-            result["img_path"] = db_image.path
-            result = json.dumps(result)
+                # print("Result: ", result)
+                result["img_path"] = db_image.path
+                result = json.dumps(result)
 
-            mqtt.publish("recognitions/person", payload=result, qos=0, retain=True)
+                mqtt.publish("recognitions/person", payload=result, qos=0, retain=True)
 
-            redis.rpush("test", result)
+                redis.rpush("test", result)
+            else:
+                print("No face detected.. Deleting image")
+                image = None
+                classification_result = ClassificationResults.query.filter_by(image_id=image_id).first()
+                db.session.delete(classification_result)
+                db.session.delete(db_image)
+                db.session.commit()
+                utils.delete_image(image_path)
+
         except ClassifierNotTrainedError:
             print("Classifier is not trained yet!")
         except Exception as e:
             print("Exception: ", e)
             print(traceback.format_exc())
         finally:
-            # send image to the live view
-            mqtt.publish("recognitions/image", payload=image_to_base64(image), qos=0, retain=True)
+            if image is not None:
+                # send image to the live view
+                mqtt.publish("recognitions/image", payload=image_to_base64(image), qos=0, retain=True)
 
-            cv2.imwrite('/live_view.jpg', image)
-            Camera.currentImage = Camera.load_image('/live_view.jpg')
+                cv2.imwrite('/live_view.jpg', image)
+                Camera.currentImage = Camera.load_image('/live_view.jpg')
 
     def add_image(self, image_id):
         print("Scheduling process_image!")

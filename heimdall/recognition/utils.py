@@ -54,6 +54,9 @@ def load_image(path, grayscale=False):
     #    im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
     return im
 
+def delete_image(path):
+    os.remove(path)
+
 
 def dlib2cv(rect):
     if isinstance(rect, dlib.rectangle):
