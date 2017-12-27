@@ -1,7 +1,6 @@
 import os
 import time
 import sys
-import redis
 import concurrent.futures
 import multiprocessing
 
@@ -66,41 +65,19 @@ class RecognitionManager:
         #    res = pool.apply_async(os.getpid, ())  # runs in *only* one process
         #    print(res.get(timeout=1))  # prints the PID of that process
 
-        self.redis = redis.StrictRedis(host="redis", port="6379", charset="utf-8", decode_responses=True)
         #self.queue = multiprocessing.Queue()
-        #self.executor = concurrent.futures.ProcessPoolExecutor(max_workers=4)
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
-
-        # fred = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-        print("Check server..")
-        self.check_server()
-        print("Clear server..")
-        self.redis.delete("test")
-        # print("Submit jobs..")
-        # for num in fred:
-        #    self.executor.submit(process_image, num)
-        # print("Shutdown..")
-        # self.executor.shutdown()
-        # print("Print results..")
-        # print(self.redis.lrange("test", 0, -1))
-
 
         # with concurrent.futures.ProcessPoolExecutor(max_workers=4) as executor:
         #   for num in fred:
         #       executor.submit(f, num)
         # the "with" keyword performs an implicit shutdown here
 
-    def check_server(self):
-        try:
-            self.redis.info()
-        except redis.exceptions.ConnectionError:
-            print("Error: cannot connect to redis server. Is the server running?")
-            sys.exit(1)
-
     # The method below will be called on the *****PoolExecutor
     @staticmethod
     def process_image(data):
-        redis, image_id = data[0]
+        queue.put(time.time())
+
+        image_id = data[0]
         print("Job started! Image-ID:", image_id)
         # print("------------")
         # print("App: ", heimdall)
@@ -130,8 +107,6 @@ class RecognitionManager:
                 result = json.dumps(result)
 
                 mqtt.publish("recognitions/person", payload=result, qos=0, retain=True)
-
-                redis.rpush("test", result)
             else:
                 print("No face detected.. Deleting image")
                 image = None
@@ -154,8 +129,6 @@ class RecognitionManager:
                 cv2.imwrite('/live_view.jpg', image)
                 Camera.currentImage = Camera.load_image('/live_view.jpg')
 
-        queue.put(time.time())
-
     def add_image(self, image_id):
         print("Scheduling process_image!")
         print("Image-ID:", image_id)
@@ -163,13 +136,9 @@ class RecognitionManager:
         RecognitionManager.process_image([(self.redis, image_id)])
 
         #self.executor.submit(RecognitionManager.process_image, [(self.redis, image_id)])
-        # print(redis_threading.lrange("test", 0, -1))
 
     def test(self):
         print(self.get_status())
-
-    def get_status(self):
-        return self.redis.lrange("test", 0, -1)
 
     def get_times(self):
         times = []
