@@ -24,6 +24,7 @@ from heimdall.models.ClassifierStats import ClassifierStats
 from heimdall.models.Labels import Labels
 from heimdall.models.Event import Event
 from heimdall.models.ClassificationResults import ClassificationResults
+from heimdall.models.RecognitionResult import RecognitionResult
 
 from heimdall.exceptions.ClassifierNotTrainedError import ClassifierNotTrainedError
 
@@ -124,6 +125,7 @@ def clear_files_from_db():
     clear images and galleries from the database, only for a resync
     :return: 
     """
+    clear_table(RecognitionResult)
     clear_table(ClassificationResults)
     clear_table(Image)
     clear_table(Gallery)
