@@ -3,7 +3,7 @@ import time
 import sys
 import concurrent.futures
 import multiprocessing
-
+import threading
 
 import traceback
 import json
@@ -11,9 +11,15 @@ import json
 from heimdall.app import mqtt
 from heimdall.camera.camera import Camera
 from heimdall.exceptions.ClassifierNotTrainedError import ClassifierNotTrainedError
+from heimdall.recognition.Classification import Classification
 
-import threading
-lock = threading.Lock()
+from heimdall.recognition import utils
+from heimdall.models.Image import Image
+from heimdall.models.Gallery import Gallery
+from heimdall.models.ClassifierStats import ClassifierStats
+import base64
+import cv2
+
 
 app = None
 db = None
@@ -52,12 +58,14 @@ class RecognitionManager:
 '''
 
 queue = multiprocessing.Queue()
+queue_results = multiprocessing.Queue()
 
 
 class RecognitionManager:
     global app
     global db
     global queue
+    global queue_results
 
     def __init__(self):
         print("init RecognitionManager")
@@ -66,57 +74,95 @@ class RecognitionManager:
         #    print(res.get(timeout=1))  # prints the PID of that process
 
         #self.queue = multiprocessing.Queue()
-        self.executor = concurrent.futures.ProcessPoolExecutor(max_workers=1)
-        #self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+        self.executor = concurrent.futures.ProcessPoolExecutor(max_workers=2)
+        #self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
         # with concurrent.futures.ProcessPoolExecutor(max_workers=4) as executor:
         #   for num in fred:
         #       executor.submit(f, num)
         # the "with" keyword performs an implicit shutdown here
 
+        self.handler_thread = threading.Thread(target=RecognitionManager.wait_for_results)
+        self.handler_thread.daemon = True
+        self.handler_thread.start()
+
+    @staticmethod
+    def wait_for_results():
+        while True:
+            (classification_result, recognition_results, image, image_id) = queue_results.get()
+            print("Received result from queue")
+            db_image = Image.query.filter_by(id=image_id).first()
+
+            bbs = []
+            predictions = []
+            if recognition_results and len(recognition_results) > 0:
+                print("Publishing results")
+                db.session.add(classification_result)
+
+                for rr in recognition_results:
+                    db.session.add(rr)
+
+                    highest_name = Gallery.query.filter(Gallery.id == rr.gallery_id).first().name
+                    image = annotate_live_image(image, rr, highest_name)
+
+                    bbs.append(rr.bounding_box)
+                    prediction_result_dict = {'highest': highest_name,
+                                              'bounding_box': rr.bounding_box,
+                                              'probability': round(rr.probability, 4)}
+                    predictions.append(prediction_result_dict)
+
+                result = {'message': 'classification complete',
+                        'predictions': predictions,
+                        'bounding_boxes': bbs,
+                        "img_path": db_image.path}
+
+                result = json.dumps(result)
+                mqtt.publish("recognitions/person", payload=result, qos=0, retain=True)
+            elif recognition_results:  # if len(recognition_results) == 0
+                print("No face detected.. Deleting image")
+                db.session.delete(db_image)
+
+                storage_image_path = os.path.join(app.config['BASEDIR'], db_image.path)
+                utils.delete_image(storage_image_path)
+
+            db.session.commit()
+
+
+            # send image to the live view
+            mqtt.publish("recognitions/image", payload=image_to_base64(image), qos=0, retain=True)
+
+            cv2.imwrite('/live_view.jpg', image)
+            Camera.currentImage = Camera.load_image('/live_view.jpg')
+
     # The method below will be called on the *****PoolExecutor
     @staticmethod
     def process_image(data):
         queue.put(time.time())
 
-        image_id = data[0]
+        image_id, base_dir, image_path, prob_threshold, labels, labels_gallery_dict, classifier, classifier_stats = data[0]
         print("Job started! Image-ID:", image_id)
-        # print("------------")
-        # print("App: ", heimdall)
-        # print("DB: ", db)
-        # print("Config: ", config)
-        # print("Image id:", image_id)
-        # print("Image: ", image[:10])
-        # print("------------")
+        storage_image_path = os.path.join(base_dir, image_path)
+        image = utils.load_image(storage_image_path)
 
-        db_image = Image.query.filter_by(id=image_id).first()
-        image_path = os.path.join(app.config['BASEDIR'], db_image.path)
-        image = utils.load_image(image_path)
+        classification_result = None
+        recognition_results = None
 
         try:
             if image is None:
                 raise AssertionError('Image was None / empty')
 
-            result = classify_db_image(db_image.id, image)
+            if classifier_stats is None:
+                raise ClassifierNotTrainedError('No model trained yet!')
 
-            annotate = True
-            if len(result['predictions']) > 0:
-                if annotate:
-                    image = annotate_live_image(image, result)
-
-                # print("Result: ", result)
-                result["img_path"] = db_image.path
-                result = json.dumps(result)
-
-                mqtt.publish("recognitions/person", payload=result, qos=0, retain=True)
-            else:
-                print("No face detected.. Deleting image")
-                image = None
-                classification_result = ClassificationResults.query.filter_by(image_id=image_id).first()
-                db.session.delete(classification_result)
-                db.session.delete(db_image)
-                db.session.commit()
-                utils.delete_image(image_path)
+            classification_result, recognition_results = Classification.classify_db_image(
+                                                                classifier=classifier,
+                                                                classifier_stats=classifier_stats,
+                                                                db_image_id=image_id,
+                                                                image=image,
+                                                                prob_threshold=prob_threshold,
+                                                                labels=labels,
+                                                                labels_gallery_dict=labels_gallery_dict
+                                                        )
 
         except ClassifierNotTrainedError:
             print("Classifier is not trained yet!")
@@ -125,21 +171,32 @@ class RecognitionManager:
             print(traceback.format_exc())
         finally:
             if image is not None:
-                # send image to the live view
-                mqtt.publish("recognitions/image", payload=image_to_base64(image), qos=0, retain=True)
-
-                cv2.imwrite('/live_view.jpg', image)
-                Camera.currentImage = Camera.load_image('/live_view.jpg')
+                queue_results.put((classification_result, recognition_results, image, image_id))
+            else:
+                print("Skipping image")
 
     def add_image(self, image_id):
         print("Scheduling process_image!")
         print("Image-ID:", image_id)
 
         #RecognitionManager.process_image([(image_id)])
-        self.executor.submit(RecognitionManager.process_image, [(image_id)])
 
-    def test(self):
-        print(self.get_status())
+        db_image = Image.query.filter_by(id=image_id).first()
+        image_path = db_image.path
+        classifier_stats = ClassifierStats.query.order_by(ClassifierStats.date.desc()).first()
+
+        labels_gallery_dict = {}
+        for gallery in Gallery.query.all():
+            labels_gallery_dict[gallery.name] = gallery.id
+
+        self.executor.submit(RecognitionManager.process_image, [(image_id,
+                                                                 app.config['BASEDIR'],
+                                                                 image_path,
+                                                                 app.config['PROBABILITY_THRESHOLD'],
+                                                                 app.labels,
+                                                                 labels_gallery_dict,
+                                                                 app.clf,
+                                                                 classifier_stats)])
 
     def get_times(self):
         times = []
@@ -164,7 +221,6 @@ class RecognitionManager:
             print(os.getpid(), "got", item)
     '''
 
-
 recognition_manager = RecognitionManager()
 
 
@@ -180,98 +236,27 @@ def init(app1, db1):
 
 
 
-import datetime
-from heimdall.recognition import utils
-from heimdall.models.Gallery import Gallery
-from heimdall.models.Image import Image
-from heimdall.models.ClassifierStats import ClassifierStats
-from heimdall.models.ClassificationResults import ClassificationResults
-from heimdall.models.RecognitionResult import RecognitionResult
-from heimdall.tasks import classify
-import numpy as np
-import base64
-import cv2
 
 
-def classify_db_image(db_image_id, image):
-    time_before_classification = datetime.datetime.now()
-
-    results, bbs = classify(app.clf, image)
-
-    time_after_classification = datetime.datetime.now()
-    diff = time_after_classification - time_before_classification
-
-    latest_clf = ClassifierStats.query.order_by(ClassifierStats.date.desc()).first()
-
-    if not latest_clf:
-        raise ClassifierNotTrainedError('No model trained yet!')
-
-    classification_result = ClassificationResults(clf_id=latest_clf.id, image_id=db_image_id,
-                                                  date=datetime.datetime.now())
-    db.session.add(classification_result)
-    db.session.flush()
-
-    predictions = []
-    # For each detected face
-    for faces, bb in zip(results, bbs):
-        # Save the highest probability (the result)
-        highest = np.argmax(faces)
-        prob = np.max(faces)
-
-        # If the probability is less then the configures threshold, the person is unknown
-        label = "unknown"
-        if prob >= app.config['PROBABILITY_THRESHOLD']:
-            label = app.labels[highest]
-        gallery = Gallery.query.filter(Gallery.name == label).first()
-        print("Label:", label)
-        print("Gallery:", gallery)
-        db.session.add(RecognitionResult(classification=classification_result.id, gallery_id=gallery.id, probability=prob, bounding_box=bb))
-        prediction_dict = {}
-        prediction_result_dict = {'highest': label,
-                                  'bounding_box': bb,
-                                  'probability': round(prob, 4)}
-        # All probabilities
-        for idx, prediction in enumerate(faces):
-            prediction_dict[app.labels[idx]] = round(prediction, 4)
-        prediction_result_dict['probabilities'] = prediction_dict
-
-        predictions.append(prediction_result_dict)
-
-        db.session.commit()
-
-    with open("timings.txt", "a") as timing_file:
-        text = str(datetime.datetime.now()) + " - Time needed for classification: " + str(diff) + \
-               " - Faces Count: " + str(len(bbs)) + "\n"
-        timing_file.write(text)
-
-    return {'message': 'classification complete',
-                    'predictions': predictions,
-                    'bounding_boxes': bbs}
-
-
-def annotate_live_image(image, classification_result):
+def annotate_live_image(image, recognition_result, name):
     """
     annotates an image with bounding boxes, names and probabilities from the classification result
     :param image: the image to annotate encoded as base64.
     :param classification_result: a classification result with one or multiple faces.
     :return: a base64 encoded image with annotations
     """
-    #image = base64.b64decode(image)
-    #image = np.fromstring(image, dtype=np.uint8)
-    #image = cv2.imdecode(image, cv2.IMREAD_COLOR)
-    for prediction in classification_result['predictions']:
-        bb = prediction['bounding_box']
-        name = prediction['highest']
-        prob = prediction['probability']
-        if name == 'unknown':
-            text = name
-            color = (0, 0, 255)
-        else:
-            text = name + ': ' + str(int(round(prob*100))) + '%'
-            color = (0, 255, 0)
-        image = cv2.rectangle(image, pt1=(bb[0], bb[1]), pt2=(bb[0] + bb[2], bb[1] + bb[3]), color=color, thickness=1)
-        image = cv2.putText(image, text, (bb[0], bb[1] + bb[3] + 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, color, thickness=2)
+
+    bb = recognition_result.bounding_box
+    prob = recognition_result.probability
+    if name == 'unknown':
+        text = name
+        color = (0, 0, 255)
+    else:
+        text = name + ': ' + str(int(round(prob*100))) + '%'
+        color = (0, 255, 0)
+    image = cv2.rectangle(image, pt1=(bb[0], bb[1]), pt2=(bb[0] + bb[2], bb[1] + bb[3]), color=color, thickness=1)
+    image = cv2.putText(image, text, (bb[0], bb[1] + bb[3] + 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, color, thickness=2)
 
     return image
 
