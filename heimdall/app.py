@@ -41,7 +41,6 @@ def create_app(config_object=DockerConfig):
 
     CORS(app)
 
-
     # Init API
     api = Api(app)
 

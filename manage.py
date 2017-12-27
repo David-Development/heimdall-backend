@@ -3,7 +3,6 @@
 
 #import threading
 #import os
-
 from flask_script import Manager
 from flask_migrate import Migrate, MigrateCommand
 from heimdall.app import create_app
@@ -23,7 +22,7 @@ def run():
             port=5000,
             use_reloader=False,
             threaded=True,  # otherwise only one client can connect to mjpeg stream
-            debug=True)
+            debug=False)
 
 
 manager.add_command('db', MigrateCommand)

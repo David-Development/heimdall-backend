@@ -21,6 +21,8 @@ import base64
 import cv2
 
 
+
+
 app = None
 db = None
 last_recognized_annotated_image = None
@@ -57,9 +59,29 @@ class RecognitionManager:
             print(os.getpid(), "got", item)
 '''
 
+def line_profiler(view=None, extra_view=None):
+    import line_profiler
+
+    def wrapper(view):
+        def wrapped(*args, **kwargs):
+            prof = line_profiler.LineProfiler()
+            prof.add_function(view)
+            if extra_view:
+                [prof.add_function(v) for v in extra_view]
+            with prof:
+                resp = view(*args, **kwargs)
+            prof.print_stats()
+            return resp
+        return wrapped
+    if view:
+        return wrapper(view)
+    return wrapper
+
+
+
+
 queue = multiprocessing.Queue()
 queue_results = multiprocessing.Queue()
-
 
 class RecognitionManager:
     global app
@@ -87,9 +109,16 @@ class RecognitionManager:
         self.handler_thread.start()
 
     @staticmethod
+    @line_profiler
     def wait_for_results():
+        counter = 0
         while True:
-            (classification_result, recognition_results, image, db_image) = queue_results.get()
+            counter += 1
+
+            if counter > 10:
+                break
+
+            (classification_result, recognition_results, image, image_id) = queue_results.get()
             print("Received result from queue")
 
             bbs = []
