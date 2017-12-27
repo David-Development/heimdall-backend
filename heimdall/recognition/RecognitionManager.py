@@ -52,10 +52,13 @@ class RecognitionManager:
             print(os.getpid(), "got", item)
 '''
 
+queue = multiprocessing.Queue()
+
 
 class RecognitionManager:
     global app
     global db
+    global queue
 
     def __init__(self):
         print("init RecognitionManager")
@@ -65,8 +68,8 @@ class RecognitionManager:
 
         self.redis = redis.StrictRedis(host="redis", port="6379", charset="utf-8", decode_responses=True)
         #self.queue = multiprocessing.Queue()
-        #self.executor = concurrent.futures.ProcessPoolExecutor(max_workers=3)
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
+        #self.executor = concurrent.futures.ProcessPoolExecutor(max_workers=4)
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 
         # fred = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         print("Check server..")
@@ -151,6 +154,8 @@ class RecognitionManager:
                 cv2.imwrite('/live_view.jpg', image)
                 Camera.currentImage = Camera.load_image('/live_view.jpg')
 
+        queue.put(time.time())
+
     def add_image(self, image_id):
         print("Scheduling process_image!")
         print("Image-ID:", image_id)
@@ -165,6 +170,16 @@ class RecognitionManager:
 
     def get_status(self):
         return self.redis.lrange("test", 0, -1)
+
+    def get_times(self):
+        times = []
+        while not queue.empty():
+            ts = queue.get()
+            if ts:
+                times.append(ts)
+            else:
+                break
+        return times
 
     '''
     def add_image(self, image):

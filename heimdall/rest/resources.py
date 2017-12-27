@@ -624,3 +624,9 @@ def delete_classifier_model(model_id):
         abort(409, description="Error occured while deleting model file from disk")
     db.session.commit()
     return jsonify({'message': 'model deleted'}), 200
+
+
+
+@app.route("/api/performance/")
+def get_rec_performance():
+    return jsonify({'times': recognition_manager.get_times()}), 200
