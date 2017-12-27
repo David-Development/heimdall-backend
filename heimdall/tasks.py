@@ -117,7 +117,7 @@ def new_image(image, filename):
     db.session.add(image)
     db.session.commit()
 
-    return image.id
+    return image
 
 
 def clear_files_from_db():

@@ -89,9 +89,8 @@ class RecognitionManager:
     @staticmethod
     def wait_for_results():
         while True:
-            (classification_result, recognition_results, image, image_id) = queue_results.get()
+            (classification_result, recognition_results, image, db_image) = queue_results.get()
             print("Received result from queue")
-            db_image = Image.query.filter_by(id=image_id).first()
 
             bbs = []
             predictions = []
@@ -131,17 +130,18 @@ class RecognitionManager:
             # send image to the live view
             mqtt.publish("recognitions/image", payload=image_to_base64(image), qos=0, retain=True)
 
-            cv2.imwrite('/live_view.jpg', image)
-            Camera.currentImage = Camera.load_image('/live_view.jpg')
+            # cv2.imwrite('/live_view.jpg', image)
+            # Camera.load_image('/live_view.jpg')
+            Camera.load_image(image)
 
     # The method below will be called on the *****PoolExecutor
     @staticmethod
     def process_image(data):
         queue.put(time.time())
 
-        image_id, base_dir, image_path, prob_threshold, labels, labels_gallery_dict, classifier, classifier_stats = data[0]
-        print("Job started! Image-ID:", image_id)
-        storage_image_path = os.path.join(base_dir, image_path)
+        db_image, base_dir, prob_threshold, labels, labels_gallery_dict, classifier, classifier_stats = data[0]
+        print("Job started! Image-ID:", db_image.id)
+        storage_image_path = os.path.join(base_dir, db_image.path)
         image = utils.load_image(storage_image_path)
 
         classification_result = None
@@ -157,7 +157,7 @@ class RecognitionManager:
             classification_result, recognition_results = Classification.classify_db_image(
                                                                 classifier=classifier,
                                                                 classifier_stats=classifier_stats,
-                                                                db_image_id=image_id,
+                                                                db_image_id=db_image.id,
                                                                 image=image,
                                                                 prob_threshold=prob_threshold,
                                                                 labels=labels,
@@ -171,27 +171,24 @@ class RecognitionManager:
             print(traceback.format_exc())
         finally:
             if image is not None:
-                queue_results.put((classification_result, recognition_results, image, image_id))
+                queue_results.put((classification_result, recognition_results, image, db_image))
             else:
                 print("Skipping image")
 
-    def add_image(self, image_id):
+    def add_image(self, db_image):
         print("Scheduling process_image!")
-        print("Image-ID:", image_id)
+        print("Image-ID:", db_image.id)
 
         #RecognitionManager.process_image([(image_id)])
 
-        db_image = Image.query.filter_by(id=image_id).first()
-        image_path = db_image.path
         classifier_stats = ClassifierStats.query.order_by(ClassifierStats.date.desc()).first()
 
         labels_gallery_dict = {}
         for gallery in Gallery.query.all():
             labels_gallery_dict[gallery.name] = gallery.id
 
-        self.executor.submit(RecognitionManager.process_image, [(image_id,
+        self.executor.submit(RecognitionManager.process_image, [(db_image,
                                                                  app.config['BASEDIR'],
-                                                                 image_path,
                                                                  app.config['PROBABILITY_THRESHOLD'],
                                                                  app.labels,
                                                                  labels_gallery_dict,

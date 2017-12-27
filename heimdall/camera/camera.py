@@ -3,13 +3,19 @@ from heimdall.camera.base_camera import BaseCamera
 from io import BytesIO
 from PIL import Image as PILImage
 from queue import Queue
+import cv2
 
 q = Queue()
 
 class Camera(BaseCamera):
 
     @staticmethod
-    def load_image(path):
+    def load_image(image):
+        ret, jpeg = cv2.imencode('.jpg', image)
+        q.put(jpeg.tobytes())
+
+    @staticmethod
+    def load_image_path(path):
         im = PILImage.open(path)
         # im.thumbnail((w, h), Image.ANTIALIAS)
         io = BytesIO()

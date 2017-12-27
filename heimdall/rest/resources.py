@@ -62,8 +62,8 @@ def handle_mytopic(client, userdata, message):
         try:
             image = message.payload.decode()
             filename = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')[:-3]) + '.jpg'
-            id = new_image(image, filename)
-            recognition_manager.add_image(image_id=id)
+            db_image = new_image(image, filename)
+            recognition_manager.add_image(db_image=db_image)
         except binascii.Error as err:
             print(err)
 
@@ -384,7 +384,7 @@ def get_mjpeg_image(frame):
 def gen(camera):
     """Video streaming generator function."""
     frame = camera.get_frame(wait=False)  # allow fast start
-    if frame:  # send image twice... otherwise chrome won't display it...
+    if frame is not None:  # send image twice... otherwise chrome won't display it...
         yield get_mjpeg_image(frame) +  get_mjpeg_image(frame)
 
     while True:
@@ -544,7 +544,7 @@ def upload_image():
     parsed_args = image_upload_parser.parse_args()
     image = parsed_args['image']
     filename = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')[:-3]) + '.jpg'
-    id = new_image(image, filename)
+    new_image(image, filename)
     return jsonify({'message': 'Image uploaded'}), 200
 
 
@@ -559,11 +559,11 @@ def new_live_image():
     parsed_args = live_parser.parse_args()
     image = parsed_args['image']
     filename = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')[:-3]) + '.jpg'
-    id = new_image(image, filename)
+    db_image = new_image(image, filename)
 
     latest_clf = ClassifierStats.query.order_by(ClassifierStats.date.desc()).first()
     if latest_clf:
-        recognition_manager.add_image(id)
+        recognition_manager.add_image(db_image=db_image)
         return jsonify({'message': 'Image processed'}), 200
     else:
         return jsonify({'message': 'No classifier present!'}), 500
