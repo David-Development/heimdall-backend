@@ -66,6 +66,8 @@ class RecognitionManager:
         #    print(res.get(timeout=1))  # prints the PID of that process
 
         #self.queue = multiprocessing.Queue()
+        self.executor = concurrent.futures.ProcessPoolExecutor(max_workers=1)
+        #self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 
         # with concurrent.futures.ProcessPoolExecutor(max_workers=4) as executor:
         #   for num in fred:
@@ -133,9 +135,8 @@ class RecognitionManager:
         print("Scheduling process_image!")
         print("Image-ID:", image_id)
 
-        RecognitionManager.process_image([(self.redis, image_id)])
-
-        #self.executor.submit(RecognitionManager.process_image, [(self.redis, image_id)])
+        #RecognitionManager.process_image([(image_id)])
+        self.executor.submit(RecognitionManager.process_image, [(image_id)])
 
     def test(self):
         print(self.get_status())
