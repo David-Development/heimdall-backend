@@ -10,7 +10,8 @@ class RecognitionResult(db.Model):
     __tablename__ = 'recognitionresult'
 
     id = db.Column(db.Integer, primary_key=True)
-    classification = db.Column(db.Integer, db.ForeignKey('classificationresults.id', ondelete='CASCADE'))
+    classification_id = db.Column(db.Integer, db.ForeignKey('classificationresults.id', ondelete='CASCADE'))
+    classification = db.relationship('ClassificationResults')
     gallery_id = db.Column(db.Integer, db.ForeignKey('gallery.id'))
     gallery = db.relationship('Gallery')
     probability = db.Column(db.Float)

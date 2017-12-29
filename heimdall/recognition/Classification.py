@@ -38,7 +38,7 @@ class Classification:
             gallery_id = labels_gallery_dict[label]
 
             print("Label:", label, " Gallery-ID:", gallery_id)
-            recognition_results.append(RecognitionResult(classification=classification_result.id,
+            recognition_results.append(RecognitionResult(classification=classification_result,
                                                          gallery_id=gallery_id,
                                                          probability=prob,
                                                          bounding_box=bb))
