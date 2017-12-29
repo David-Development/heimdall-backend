@@ -21,43 +21,10 @@ import base64
 import cv2
 
 
-
-
 app = None
 db = None
 last_recognized_annotated_image = None
 
-'''
-print("RecognitionManager __init__ called!")
-print("###################################")
-for line in traceback.format_stack():
-    line = line.strip()
-    if str(line).startswith("File \"<frozen"):
-        pass
-    else:
-        print("Hierarchy: " + line)
-print("###################################")
-'''
-
-
-'''
-class RecognitionManager:
-    def __init__(self):
-        print("init RecognitionManager")
-        self.queue = multiprocessing.Queue()
-        self.pool = multiprocessing.Pool(3, self.worker, (self.queue,))
-
-    def add_image(self, image):
-        self.queue.put(image)
-
-    def worker(self, queue):
-        print(os.getpid(), "working")
-        while True:
-            print(os.getpid(), " - Waiting!")
-            item = self.queue.get(True)
-            print(os.getpid(), " - Waiting!")
-            print(os.getpid(), "got", item)
-'''
 
 def line_profiler(view=None, extra_view=None):
     import line_profiler
@@ -108,22 +75,19 @@ class RecognitionManager:
         self.handler_thread.daemon = True
         self.handler_thread.start()
 
+
     @staticmethod
     @line_profiler
     def wait_for_results():
-        counter = 0
+        # counter = 0
         while True:
-            counter += 1
+            (classification_result, recognition_results, image, db_image) = queue_results.get()
 
-            if counter > 10:
-                break
-
-            (classification_result, recognition_results, image, image_id) = queue_results.get()
-            print("Received result from queue")
-
+            queue.put(time.time())
+            
             bbs = []
             predictions = []
-            if recognition_results and len(recognition_results) > 0:
+            if recognition_results: # Empty sequences are false
                 print("Publishing results")
                 db.session.add(classification_result)
 
@@ -140,13 +104,13 @@ class RecognitionManager:
                     predictions.append(prediction_result_dict)
 
                 result = {'message': 'classification complete',
-                        'predictions': predictions,
-                        'bounding_boxes': bbs,
-                        "img_path": db_image.path}
+                          'predictions': predictions,
+                          'bounding_boxes': bbs,
+                          'img_path': db_image.path}
 
                 result = json.dumps(result)
                 mqtt.publish("recognitions/person", payload=result, qos=0, retain=True)
-            elif recognition_results:  # if len(recognition_results) == 0
+            else:
                 print("No face detected.. Deleting image")
                 db.session.delete(db_image)
 
@@ -155,26 +119,27 @@ class RecognitionManager:
 
             db.session.commit()
 
+            
+            if recognition_results or classification_result is None: # Send if face was detected or if an error occured
+                mqtt.publish("recognitions/image", payload=image_to_base64(image), qos=0, retain=True)
+                Camera.load_image(image)
+            
 
-            # send image to the live view
-            mqtt.publish("recognitions/image", payload=image_to_base64(image), qos=0, retain=True)
+            #counter += 1
+            #if counter >= 100:
+            #    break
 
-            # cv2.imwrite('/live_view.jpg', image)
-            # Camera.load_image('/live_view.jpg')
-            Camera.load_image(image)
 
     # The method below will be called on the *****PoolExecutor
     @staticmethod
     def process_image(data):
-        queue.put(time.time())
-
         db_image, base_dir, prob_threshold, labels, labels_gallery_dict, classifier, classifier_stats = data[0]
         print("Job started! Image-ID:", db_image.id)
         storage_image_path = os.path.join(base_dir, db_image.path)
         image = utils.load_image(storage_image_path)
 
         classification_result = None
-        recognition_results = None
+        recognition_results = []
 
         try:
             if image is None:
@@ -184,14 +149,14 @@ class RecognitionManager:
                 raise ClassifierNotTrainedError('No model trained yet!')
 
             classification_result, recognition_results = Classification.classify_db_image(
-                                                                classifier=classifier,
-                                                                classifier_stats=classifier_stats,
-                                                                db_image_id=db_image.id,
-                                                                image=image,
-                                                                prob_threshold=prob_threshold,
-                                                                labels=labels,
-                                                                labels_gallery_dict=labels_gallery_dict
-                                                        )
+                classifier=classifier,
+                classifier_stats=classifier_stats,
+                db_image_id=db_image.id,
+                image=image,
+                prob_threshold=prob_threshold,
+                labels=labels,
+                labels_gallery_dict=labels_gallery_dict
+            )
 
         except ClassifierNotTrainedError:
             print("Classifier is not trained yet!")
@@ -204,9 +169,9 @@ class RecognitionManager:
             else:
                 print("Skipping image")
 
+
     def add_image(self, db_image):
-        print("Scheduling process_image!")
-        print("Image-ID:", db_image.id)
+        print("Scheduling image with ID:", db_image.id)
 
         #RecognitionManager.process_image([(image_id)])
 
@@ -224,6 +189,7 @@ class RecognitionManager:
                                                                  app.clf,
                                                                  classifier_stats)])
 
+
     def get_times(self):
         times = []
         while not queue.empty():
@@ -234,21 +200,8 @@ class RecognitionManager:
                 break
         return times
 
-    '''
-    def add_image(self, image):
-        self.queue.put(image)
-
-    def worker(self, queue):
-        print(os.getpid(), "working")
-        while True:
-            print(os.getpid(), " - Waiting!")
-            item = self.queue.get(True)
-            print(os.getpid(), " - Waiting!")
-            print(os.getpid(), "got", item)
-    '''
 
 recognition_manager = RecognitionManager()
-
 
 def init(app1, db1):
     global app
@@ -256,10 +209,6 @@ def init(app1, db1):
 
     app = app1
     db = db1
-    pass
-
-
-
 
 
 

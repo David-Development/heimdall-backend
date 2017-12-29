@@ -98,7 +98,7 @@ class BaseCamera(object):
             BaseCamera.event.set()  # send signal to clients
             time.sleep(0)
 
-            print("Received and signaled new image!")
+            #print("Received and signaled new image!")
 
             # if there hasn't been any clients asking for frames in
             # the last 10 seconds then stop the thread
