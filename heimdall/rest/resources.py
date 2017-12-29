@@ -3,6 +3,7 @@ import glob
 import datetime
 import json
 import time
+import re
 
 import binascii
 from flask_restful import Resource, reqparse, marshal_with, fields, abort
@@ -27,6 +28,8 @@ from heimdall.recognition import utils
 from heimdall.recognition.RecognitionManager import recognition_manager, last_recognized_annotated_image
 from heimdall.tasks import (sync_db_from_filesystem, delete_gallery, move_images, download_models, models_exist,
                             TrainRecognizer, load_classifier, new_image, clear_gallery)
+
+pattern_resolution = re.compile('^(\d+)x(\d+)$')
 
 config = app.config
 
@@ -286,6 +289,7 @@ def getDetectionResults(image_id):
         if res:
             empDict = {
                 #'id': classif.id,
+
                 'id': res.gallery_id,
                 'location': [res.x, res.y, res.w, res.h]
             }
@@ -313,7 +317,7 @@ def getImagesForEvent(event_id):
         imageList.append(empDict)
     return imageList
 
-@app.route("/events/", methods=['GET'])
+@app.route("/api/events/", methods=['GET'])
 def getEvents():
     eventList = []
     for event in Event.query.order_by(Event.begindate.desc()).all():
@@ -329,7 +333,7 @@ def getEvents():
 
     return jsonify(eventList), 201
 
-@app.route("/persons/", methods=['GET'])
+@app.route("/api/persons/", methods=['GET'])
 def getPersons():
     galleryList = []
     #for gallery in Gallery.query.filter(Gallery.name != "unkown").all():
@@ -360,7 +364,7 @@ def getImagesForPerson(query):
         imageList.append(empDict)
     return imageList
 
-@app.route("/person/<int:person_id>/", methods=['GET'])
+@app.route("/api/person/<int:person_id>/", methods=['GET'])
 def getPersonById(person_id):
     empDict = {}
     gallery = Gallery.query.filter(Gallery.id == person_id).first()
@@ -392,7 +396,7 @@ def gen(camera):
         yield get_mjpeg_image(frame) + get_mjpeg_image(frame)
 
 
-@app.route('/video_feed')
+@app.route('/api/video_feed')
 def video_feed():
     return Response(gen(Camera()), mimetype='multipart/x-mixed-replace; boundary=frame')
 
@@ -448,11 +452,10 @@ def resync_db():
     return jsonify({'message': 'db resynced from filesystem'}), 201
 
 
-@app.route('/images/<path:filename>')
-def show_images(filename):
+@app.route('/api/image/<path:filename>')
+def show_image(filename):
     try:
         im = PILImage.open(config['IMAGE_BASE_PATH'] + '/' + filename)
-        #im.thumbnail((w, h), Image.ANTIALIAS)
         io = BytesIO()
         im.save(io, format='JPEG')
         return Response(io.getvalue(), mimetype='image/jpeg')
@@ -461,6 +464,24 @@ def show_images(filename):
 
     # Method below returns ERR_CONTENT_LENGTH_MISMATCH sometimes
     #return send_from_directory(config['IMAGE_BASE_PATH'], filename)
+
+@app.route('/api/resized-image/<resolution>/<path:filename>')
+def show_image_resized(resolution, filename):
+    match = pattern_resolution.match(resolution)
+    if match:
+        width = int(match.group(1))
+        height = int(match.group(2))
+    else:
+        raise ValueError("Expected resolution in format '111x111'")
+
+    try:
+        im = PILImage.open(config['IMAGE_BASE_PATH'] + '/' + filename)
+        im.thumbnail((width, height), PILImage.BICUBIC) # Resize images
+        io = BytesIO()
+        im.save(io, format='JPEG')
+        return Response(io.getvalue(), mimetype='image/jpeg')
+    except IOError:
+        abort(404)
 
 
 @app.route("/api/dlib_models/", methods=['GET', 'POST'])
@@ -500,13 +521,13 @@ def model_download_status(task_id):
     return jsonify(response)
 
 
-@app.route("/teapot")
+@app.route("/api/teapot")
 def teapot():
     recognition_manager.test()
     return jsonify({'message': 'I\'m a Teapot!'}), 418
 
 
-@app.route("/status")
+@app.route("/api/status")
 def status_recognition():
     status_arr = recognition_manager.get_status()
     # ["{}", "{}"]
@@ -574,9 +595,9 @@ def recognizer_training_status():
     return jsonify(train_recognizer.get_status()), 200
 
 
-@app.route("/api/classifier/")
-def get_classifier():
-    return jsonify(ClassifierStats.query.order_by(ClassifierStats.loaded.desc(), ClassifierStats.date.desc()).all()), 200
+#@app.route("/api/classifier/")
+#def get_classifier():
+#    return jsonify(ClassifierStats.query.order_by(ClassifierStats.loaded.desc(), ClassifierStats.date.desc()).all()), 200
 
 
 @app.route("/api/classifier/load/", methods=['POST'])
