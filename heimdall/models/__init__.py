@@ -2,15 +2,18 @@ import os
 import glob
 
 
+def init_database():
+    from heimdall.rest import resources
+    # Resync database on startup
+    resources.resync_db()
+
+
 def init_models(app, db):
     from heimdall.rest import resources
     from heimdall.models.ClassifierStats import ClassifierStats
     from heimdall.tasks import create_classifier, load_classifier
 
     print("init_models")
-
-    # Resync database on startup
-    resources.resync_db()
 
     # Check for dlib models and download if necessary
     resources.check_models()
