@@ -305,7 +305,7 @@ def getImagesForEvent(event_id):
     # TODO The RecognitionResult GalleryID is relevant.. check if recognitionresult.galleryid != new_id
     for image in Image.query \
             .filter(Image.event_id == event_id) \
-            .order_by(Image.createdate.desc()).limit(5).all():
+            .order_by(Image.createdate.desc()).all(): # limit(5)
             #.filter(Image.event_id == event_id, Image.gallery_id != gallery_new_id)\
 
         empDict = {
