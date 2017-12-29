@@ -211,7 +211,7 @@ class ImageListRes(Resource):
         for image in images:
             image.gallery_id = gallery_id
             image.path = os.path.join(gallery.path, image.name)
-            ClassificationResults.query.filter_by(image_id=image.id).delete()
+            #ClassificationResults.query.filter_by(image_id=image.id).delete()
 
         db.session.commit()
 
