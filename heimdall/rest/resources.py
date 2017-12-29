@@ -346,8 +346,8 @@ def getPersons():
             'images': gallery.images.count()
         }
 
-        avatar = gallery.images.first()
-        empDict['avatar'] = avatar.path if avatar else ""
+        avatar = gallery.images.order_by(Image.id.desc()).first()
+        empDict['avatar'] = "face-" + avatar.path if avatar else ""
 
         galleryList.append(empDict)
 
@@ -452,7 +452,7 @@ def resync_db():
     return jsonify({'message': 'db resynced from filesystem'}), 201
 
 
-@app.route('/api/image/<path:filename>')
+@app.route('/api/images/<path:filename>')
 def show_image(filename):
     try:
         im = PILImage.open(config['IMAGE_BASE_PATH'] + '/' + filename)
@@ -465,14 +465,15 @@ def show_image(filename):
     # Method below returns ERR_CONTENT_LENGTH_MISMATCH sometimes
     #return send_from_directory(config['IMAGE_BASE_PATH'], filename)
 
-@app.route('/api/resized-image/<resolution>/<path:filename>')
-def show_image_resized(resolution, filename):
+@app.route('/api/resized-images/<path:filename>')
+def show_image_resized(filename):
+    filename, resolution = filename.rsplit('/', 1)
     match = pattern_resolution.match(resolution)
     if match:
         width = int(match.group(1))
         height = int(match.group(2))
     else:
-        raise ValueError("Expected resolution in format '111x111'")
+        raise ValueError("Expected resolution in format '/api/resized-images/<path:filename>/WIDTHxHEIGHT'")
 
     try:
         im = PILImage.open(config['IMAGE_BASE_PATH'] + '/' + filename)
@@ -483,6 +484,30 @@ def show_image_resized(resolution, filename):
     except IOError:
         abort(404)
 
+@app.route('/api/face-images/<path:filename>')
+def show_image_face(filename):
+    try:
+        image = Image.query.filter(Image.path == 'images/' + filename).first()
+        if not image:
+            abort(404)
+
+        im = PILImage.open(config['IMAGE_BASE_PATH'] + '/' + filename)
+
+        classification_result = ClassificationResults.query.filter(ClassificationResults.image_id == image.id).first()
+        print("classification_result", classification_result)
+        if classification_result:
+
+            recognition_result = classification_result.results.first()
+            #recognition_result = RecognitionResult.query.filter(RecognitionResult.classification == classification_result).first()
+            print("recognition_result", recognition_result)
+            if recognition_result:
+                im = im.crop((recognition_result.x, recognition_result.y, recognition_result.x + recognition_result.w, recognition_result.y + recognition_result.h))
+
+        io = BytesIO()
+        im.save(io, format='JPEG')
+        return Response(io.getvalue(), mimetype='image/jpeg')
+    except IOError:
+        abort(404)
 
 @app.route("/api/dlib_models/", methods=['GET', 'POST'])
 def check_models():
