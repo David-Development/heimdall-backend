@@ -91,11 +91,15 @@ class RecognitionManager:
                 print("Publishing results")
                 db.session.add(classification_result)
 
+                names = []
+
                 for rr in recognition_results:
                     db.session.add(rr)
 
                     highest_name = Gallery.query.filter(Gallery.id == rr.gallery_id).first().name
                     image = annotate_live_image(image, rr, highest_name)
+
+                    names.append(highest_name)
 
                     bbs.append(rr.bounding_box)
                     prediction_result_dict = {'highest': highest_name,
@@ -110,6 +114,26 @@ class RecognitionManager:
 
                 result = json.dumps(result)
                 mqtt.publish("recognitions/person", payload=result, qos=0, retain=True)
+
+                '''
+                names_string = ",".join(names)
+                print("Names:", names_string)
+
+                
+                # Update user-variable
+                domoticz = {'idx': 1,
+                            'command': 'setuservariable',
+                            'value': names_string }
+                mqtt.publish("domoticz/in", payload=json.dumps(domoticz), qos=0, retain=True)
+
+                # update virtual sensor
+                domoticz = {'idx': 1,
+                            'nvalue': 0,
+                            'svalue': names_string }
+                mqtt.publish("domoticz/in", payload=json.dumps(domoticz), qos=0, retain=True)
+                
+                mqtt.publish("recognitions/personname", payload=names_string, qos=0, retain=True)
+                '''
             else:
                 print("No face detected.. Deleting image")
                 db.session.delete(db_image)
@@ -121,20 +145,25 @@ class RecognitionManager:
 
             
             if recognition_results or classification_result is None: # Send if face was detected or if an error occured
+                # Send image (as base64) via MQTT
                 mqtt.publish("recognitions/image", payload=image_to_base64(image), qos=0, retain=True)
+                
+                # Send image (as raw jpeg) via MQTT
+                #_, jpeg = cv2.imencode('.jpg', image)
+                #mqtt.publish("recognitions/rawimage", payload=jpeg.tobytes(), qos=0, retain=True)
                 Camera.load_image(image)
-            
+            elif classification_result is None:
+                print("Not sending image - No classification result")
+            else:
+                print("Not sending image - Number of persons detected:", classification_result.num_persons)
 
-            #counter += 1
-            #if counter >= 100:
-            #    break
             # Live View
             if(app.config['ENABLE_LIVEVIEW']):
                 print("Note: Sending image to liveview - disable live view in production!")
                 mqtt.publish("liveview", payload=image_to_base64(image), qos=0, retain=True)
 
 
-    # The method below will be called on the *****PoolExecutor
+    # The method below will be called on the (Thread/Process)-PoolExecutor
     @staticmethod
     def process_image(data):
         db_image, base_dir, prob_threshold, labels, labels_gallery_dict, classifier, classifier_stats = data[0]
@@ -213,8 +242,6 @@ def init(app1, db1):
 
     app = app1
     db = db1
-
-
 
 
 def annotate_live_image(image, recognition_result, name):

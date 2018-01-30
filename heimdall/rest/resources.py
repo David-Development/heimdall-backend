@@ -302,10 +302,10 @@ def getImagesForEvent(event_id):
 
     #gallery_new_id = Gallery.query.filter(Gallery.name == 'new').first().id
 
-    # TODO The RecognitionResult GalleryID is relevant.. check if recognitionresult.galleryid != new_id
     for image in Image.query \
             .filter(Image.event_id == event_id) \
-            .order_by(Image.createdate.desc()).all(): # limit(5)
+            .order_by(Image.createdate.desc()).all():
+            #.order_by(Image.createdate.desc()).limit(5):
             #.filter(Image.event_id == event_id, Image.gallery_id != gallery_new_id)\
 
         empDict = {
@@ -314,7 +314,13 @@ def getImagesForEvent(event_id):
             'detected': getDetectionResults(image.id),
             'user_id': image.gallery_id
         }
+
         imageList.append(empDict)
+        # Only allow images to be classified with exactly one face
+        #if(len(empDict["detected"]) == 1):
+        #    imageList.append(empDict)
+        #else:
+        #    print("Classification List empty.. skipping")
     return imageList
 
 @app.route("/api/events/", methods=['GET'])
