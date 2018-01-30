@@ -128,6 +128,10 @@ class RecognitionManager:
             #counter += 1
             #if counter >= 100:
             #    break
+            # Live View
+            if(app.config['ENABLE_LIVEVIEW']):
+                print("Note: Sending image to liveview - disable live view in production!")
+                mqtt.publish("liveview", payload=image_to_base64(image), qos=0, retain=True)
 
 
     # The method below will be called on the *****PoolExecutor

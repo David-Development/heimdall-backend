@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 import os
 
+def str2bool(v):
+  return str(v).lower() in ("yes", "true", "1")
 
 class Config(object):
     """Base configuration."""
 
     DOCKER = False
-
+    ENABLE_LIVEVIEW = str2bool(os.environ['ENABLE_LIVEVIEW'])
     BASEDIR = os.path.abspath(os.path.dirname(__file__)) # TODO rename to APP_DIR
 
     # MQTT Setup
