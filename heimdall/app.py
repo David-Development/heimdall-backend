@@ -4,7 +4,7 @@ import os
 import redis as red
 import eventlet
 from flask import Flask
-from flask_mqtt.flask_mqtt import Mqtt
+from flask_mqtt import Mqtt
 from flask_restful import Api
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS

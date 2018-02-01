@@ -11,10 +11,6 @@ export PYTHONUNBUFFERED=TRUE
 set DISPLAY :0
 
 
-$python flask_mqtt/setup.py install
-$python -m pip install line_profiler
-
-
 models_file="./heimdall/ml_models/dlib_face_recognition_resnet_model_v1.dat"
 if [ -f "$models_file" ]
 then

@@ -1,11 +1,14 @@
 alembic==0.9.6
-Flask_Migrate==2.1.1
 SQLAlchemy==1.2.0b3
+
+Flask_Migrate==2.1.1
 Flask==0.12.2
 Flask_RESTful==0.3.6
 Flask_SQLAlchemy==2.3.2
 Flask_Script==2.0.6
 flask-cors==3.0.3
+-e git+https://github.com/David-Development/Flask-MQTT.git@master#egg=Flask-MQTT
+
 redis==2.10.6
 dlib==19.7.0
 numpy==1.13.3
@@ -19,3 +22,4 @@ scikit-plot==0.3.3
 psycopg2==2.7.3.2
 augmentor==0.1.8
 gunicorn==19.7.1
+line_profiler==2.1.2
