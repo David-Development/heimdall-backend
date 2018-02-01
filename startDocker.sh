@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Reconfigure Timezone to reflect the Timezone set in environment variable
+ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+dpkg-reconfigure -f noninteractive tzdata
+
+
 python="python3" # "python3" or "python"
 
 export PYTHONUNBUFFERED=TRUE
