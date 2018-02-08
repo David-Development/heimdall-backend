@@ -21,6 +21,7 @@ from heimdall.models.Event import Event
 from heimdall.models.ClassifierStats import ClassifierStats
 from heimdall.models.ClassificationResults import ClassificationResults
 from heimdall.models.RecognitionResult import RecognitionResult
+from heimdall.profiler.line_profiler import line_profiler
 
 from heimdall.camera.camera import Camera
 from heimdall.app import api, app, db, recognizer, clf, labels, redis, mqtt
@@ -282,25 +283,26 @@ def recent_classifications():
                            classifications=classifications, galleries=gls)
 
 
-def getDetectionResults(image_id):
-    detectionList = []
-    for classif in ClassificationResults.query.filter(ClassificationResults.image_id == image_id).all():
-        res = classif.results.first()
-        if res:
-            empDict = {
-                #'id': classif.id,
+def getAllRecognitions():
+    recognitions = {}
+    for rec in RecognitionResult.query.all():
+        # create a list containing all the recognitions grouped by the corresponding classification id
+        recognitions.setdefault(rec.classification_id, []).append(
+            {'id': rec.gallery_id, 'location': [rec.x, rec.y, rec.w, rec.h]}
+        )
+    return recognitions
 
-                'id': res.gallery_id,
-                'location': [res.x, res.y, res.w, res.h]
-            }
-            detectionList.append(empDict)
-    #print(detectionList)
-    return detectionList
+def getAllClassifications():
+    classifications = {}
+    recognitions = getAllRecognitions()  # get all recognitions
+    # Get all classifications
+    for classifi in ClassificationResults.query.all():
+        if classifi.id in recognitions:
+            classifications[classifi.image_id] = recognitions[classifi.id]
+    return classifications
 
 def getImagesForEvent(event_id):
     imageList = []
-
-    #gallery_new_id = Gallery.query.filter(Gallery.name == 'new').first().id
 
     for image in Image.query \
             .filter(Image.event_id == event_id) \
@@ -311,7 +313,8 @@ def getImagesForEvent(event_id):
         empDict = {
             'id': image.id,
             'url': image.path,
-            'detected': getDetectionResults(image.id),
+            'detected': [],
+            #'detected': getDetectionResults(image.id),
             'user_id': image.gallery_id
         }
 
@@ -324,20 +327,29 @@ def getImagesForEvent(event_id):
     return imageList
 
 @app.route("/api/events/", methods=['GET'])
+#@line_profiler
 def getEvents():
-    eventList = []
+    event_list = []
     for event in Event.query.order_by(Event.begindate.desc()).all():
-        empDict = {
+        emp_dict = {
             'id': event.id,
             'date': event.begindate.date().isoformat(),
             'time': event.begindate.time().isoformat(),
             'images': getImagesForEvent(event.id)
         }
+        if len(emp_dict['images']) > 0:
+            event_list.append(emp_dict)
 
-        if len(empDict['images']) > 0:
-            eventList.append(empDict)
+    classifications = getAllClassifications()
 
-    return jsonify(eventList), 201
+    # Merge Events (Images) with Classification Results (More efficient in memory than by joining via the database)
+    for event in event_list:
+        for img in event["images"]:
+            img_id = img["id"]
+            if img_id in classifications:
+                img["detected"] = classifications[img_id]
+
+    return jsonify(event_list), 201
 
 @app.route("/api/persons/", methods=['GET'])
 def getPersons():
