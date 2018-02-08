@@ -117,7 +117,10 @@ class RecognitionManager:
                 
                 mqtt.publish("recognitions/personname", payload=names_string, qos=0, retain=True)
                 '''
-            else:
+            if not recognition_results and not classification_result:
+                print("Skipping delete.. is the classifier trained yet?")
+            elif not recognition_results:
+                print(classification_result)
                 print("No face detected.. Deleting image")
                 db.session.delete(db_image)
 
