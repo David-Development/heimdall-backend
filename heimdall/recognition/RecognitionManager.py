@@ -13,6 +13,7 @@ from heimdall.camera.camera import Camera
 from heimdall.exceptions.ClassifierNotTrainedError import ClassifierNotTrainedError
 from heimdall.recognition.Classification import Classification
 
+from heimdall.profiler.line_profiler import line_profiler
 from heimdall.recognition import utils
 from heimdall.models.Image import Image
 from heimdall.models.Gallery import Gallery
@@ -25,24 +26,6 @@ app = None
 db = None
 last_recognized_annotated_image = None
 
-
-def line_profiler(view=None, extra_view=None):
-    import line_profiler
-
-    def wrapper(view):
-        def wrapped(*args, **kwargs):
-            prof = line_profiler.LineProfiler()
-            prof.add_function(view)
-            if extra_view:
-                [prof.add_function(v) for v in extra_view]
-            with prof:
-                resp = view(*args, **kwargs)
-            prof.print_stats()
-            return resp
-        return wrapped
-    if view:
-        return wrapper(view)
-    return wrapper
 
 
 
