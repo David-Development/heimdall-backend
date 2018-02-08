@@ -326,6 +326,7 @@ def getImagesForEvent(event_id):
         #    print("Classification List empty.. skipping")
     return imageList
 
+# Optimizations improved test from 25s to 480ms
 @app.route("/api/events/", methods=['GET'])
 #@line_profiler
 def getEvents():

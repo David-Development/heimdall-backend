@@ -60,7 +60,7 @@ class RecognitionManager:
 
 
     @staticmethod
-    @line_profiler
+    #@line_profiler
     def wait_for_results():
         # counter = 0
         while True:
@@ -120,7 +120,6 @@ class RecognitionManager:
             if not recognition_results and not classification_result:
                 print("Skipping delete.. is the classifier trained yet?")
             elif not recognition_results:
-                print(classification_result)
                 print("No face detected.. Deleting image")
                 db.session.delete(db_image)
 
