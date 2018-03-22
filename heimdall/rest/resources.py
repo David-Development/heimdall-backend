@@ -301,14 +301,29 @@ def getAllClassifications():
             classifications[classifi.image_id] = recognitions[classifi.id]
     return classifications
 
+#@line_profiler
+def getAllImages():
+    imageList = { }
+    images = Image.query.order_by(Image.event_id, Image.createdate.desc()).all()
+    for image in images:
+        imageList.setdefault(image.event_id,[]).append(
+            {
+                'id': image.id,
+                'url': image.path,
+                'detected': [],
+                'user_id': image.gallery_id
+            }
+        )
+    return imageList
+
+
 def getImagesForEvent(event_id):
     imageList = []
 
     for image in Image.query \
             .filter(Image.event_id == event_id) \
-            .order_by(Image.createdate.desc()).all():
-            #.order_by(Image.createdate.desc()).limit(5):
-            #.filter(Image.event_id == event_id, Image.gallery_id != gallery_new_id)\
+            .order_by(Image.createdate.desc()) \
+            .all():
 
         empDict = {
             'id': image.id,
@@ -326,31 +341,50 @@ def getImagesForEvent(event_id):
         #    print("Classification List empty.. skipping")
     return imageList
 
-# Optimizations improved test from 25s to 480ms
+
 @app.route("/api/events/", methods=['GET'])
 #@line_profiler
 def getEvents():
+    event_list = getInfosForEvent(Event.query.order_by(Event.begindate.desc()).all())
+    return jsonify(event_list), 201
+
+
+@app.route("/api/event/<int:event_id>", methods=['GET'])
+def getEvent(event_id):
+    event = getInfosForEvent([Event.query.get(event_id)])[0]
+    return jsonify(event), 201
+
+#@line_profiler
+def getInfosForEvent(events):
     event_list = []
-    for event in Event.query.order_by(Event.begindate.desc()).all():
+    for event in events:
         emp_dict = {
             'id': event.id,
             'date': event.begindate.date().isoformat(),
-            'time': event.begindate.time().isoformat(),
-            'images': getImagesForEvent(event.id)
+            'time': event.begindate.time().isoformat()
         }
-        if len(emp_dict['images']) > 0:
-            event_list.append(emp_dict)
+        event_list.append(emp_dict)
 
+    images = getAllImages()
     classifications = getAllClassifications()
 
     # Merge Events (Images) with Classification Results (More efficient in memory than by joining via the database)
+    #print(images)
     for event in event_list:
+        event["images"] = []
+        if event["id"] in images:
+            event["images"] = images[event["id"]]
+        #print(event["images"])
         for img in event["images"]:
             img_id = img["id"]
             if img_id in classifications:
                 img["detected"] = classifications[img_id]
 
-    return jsonify(event_list), 201
+    event_list = [event for event in event_list if len(event['images']) > 0]
+    #event_list = filter(lambda event: len(event['images']) > 0, event_list)
+
+    return event_list
+
 
 @app.route("/api/persons/", methods=['GET'])
 def getPersons():
