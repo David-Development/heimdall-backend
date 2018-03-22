@@ -17,17 +17,17 @@ RUN apt-get update \
     && apt-get install -y git tzdata libboost-all-dev netcat \
     && rm -rf /var/lib/apt/lists/*
 
+# matplotlib config (used by benchmark)
+RUN mkdir -p /root/.config/matplotlib \
+    && echo "backend : Agg" > /root/.config/matplotlib/matplotlibrc
+
 # copy the requirements file over
 COPY ./requirements.txt requirements.txt
 RUN pip3 install -U -r requirements.txt \
     && rm requirements.txt
 
-VOLUME ["/app"]
 WORKDIR /app/
-
-# matplotlib config (used by benchmark)
-RUN mkdir -p /root/.config/matplotlib \
-    && echo "backend : Agg" > /root/.config/matplotlib/matplotlibrc
+COPY . /app/
 
 CMD /bin/bash -c "sh ./wait-for mqtt-broker:1883 -t 60 -- sh startDocker.sh"
 #CMD /bin/bash -c "sh startDocker.sh"
