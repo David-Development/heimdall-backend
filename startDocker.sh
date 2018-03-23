@@ -20,10 +20,10 @@ else
     cd ./heimdall/ml_models
     wget https://github.com/davisking/dlib-models/raw/master/dlib_face_recognition_resnet_model_v1.dat.bz2
     wget https://github.com/davisking/dlib-models/raw/master/shape_predictor_68_face_landmarks.dat.bz2
-    bunzip2 dlib_face_recognition_resnet_model_v1.dat.bz2 # unzip
-    bunzip2 shape_predictor_68_face_landmarks.dat.bz2     # unzip
-    rm dlib_face_recognition_resnet_model_v1.dat.bz2 # cleanup
-    rm shape_predictor_68_face_landmarks.dat.bz2     # cleanup
+    bunzip2 dlib_face_recognition_resnet_model_v1.dat.bz2 # unzip (and deletes file)
+    bunzip2 shape_predictor_68_face_landmarks.dat.bz2     # unzip (and deletes file)
+    #rm dlib_face_recognition_resnet_model_v1.dat.bz2 # cleanup
+    #rm shape_predictor_68_face_landmarks.dat.bz2     # cleanup
     cd ../../
     echo "##################################################"
     
