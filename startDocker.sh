@@ -38,7 +38,7 @@ else
     echo "$setup_file file not found. Starting init process!"
 
     echo "init database..."
-    rm -R migrations/
+    #rm -R migrations/ (not needed anymore - migrations/ as well as setup_done is stored in the container itself)
     $python manage.py db init
 
     echo "migrate database..."
