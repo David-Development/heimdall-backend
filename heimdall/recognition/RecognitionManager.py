@@ -71,7 +71,7 @@ class RecognitionManager:
     def wait_for_results():
         # counter = 0
         while True:
-            (classification_result, recognition_results, image, db_image) = queue_results.get()
+            (classification_result, recognition_results, image, db_image, face_detected) = queue_results.get()
 
             queue.put(time.time())
             
@@ -127,13 +127,16 @@ class RecognitionManager:
                 mqtt.publish("recognitions/personname", payload=names_string, qos=0, retain=True)
                 '''
             if not recognition_results and not classification_result:
-                print("Skipping delete.. is the classifier trained yet?")
+                print("Classifier trained yet?")
+                if not face_detected:
+                    print("No face detected.. Deleting image")
+                    RecognitionManager.delete_image(db_image)
             elif not recognition_results:
                 print("No face detected.. Deleting image")
-                db.session.delete(db_image)
+                RecognitionManager.delete_image(db_image)
 
-                storage_image_path = os.path.join(app.config['BASEDIR'], db_image.path)
-                utils.delete_image(storage_image_path)
+            #print(recognition_results)
+            #print(classification_result)
 
             db.session.commit()
 
@@ -157,6 +160,12 @@ class RecognitionManager:
                 mqtt.publish("liveview", payload=image_to_base64(image), qos=0, retain=True)
 
 
+    @staticmethod
+    def delete_image(db_image):
+        db.session.delete(db_image)
+        storage_image_path = os.path.join(app.config['BASEDIR'], db_image.path)
+        utils.delete_image(storage_image_path)
+
     # The method below will be called on the (Thread/Process)-PoolExecutor
     @staticmethod
     def process_image(data):
@@ -168,34 +177,38 @@ class RecognitionManager:
         classification_result = None
         recognition_results = []
 
+        face_detected = False
+
         try:
             if image is None:
                 raise AssertionError('Image was None / empty')
 
-            if classifier_stats is None:
-                raise ClassifierNotTrainedError('No model trained yet!')
+            if classifier_stats is None:  # Classifier is not trained!
+                face_detected = Classification.detect_faces(image)
+                print(face_detected)
+            else:
+                classification_result, recognition_results = Classification.classify_db_image(
+                    classifier=classifier,
+                    classifier_stats=classifier_stats,
+                    db_image_id=db_image.id,
+                    image=image,
+                    prob_threshold=prob_threshold,
+                    labels=labels,
+                    labels_gallery_dict=labels_gallery_dict
+                )
 
-            classification_result, recognition_results = Classification.classify_db_image(
-                classifier=classifier,
-                classifier_stats=classifier_stats,
-                db_image_id=db_image.id,
-                image=image,
-                prob_threshold=prob_threshold,
-                labels=labels,
-                labels_gallery_dict=labels_gallery_dict
-            )
-
-        except ClassifierNotTrainedError:
-            print("Classifier is not trained yet!")
+                face_detected = classification_result is None  # TODO check if this is correct!!
+                print("Class: ", classification_result)
+                print("Rec: ", recognition_results)
+                print("Face detected: ", face_detected)
         except Exception as e:
             print("Exception: ", e)
             print(traceback.format_exc())
         finally:
             if image is not None:
-                queue_results.put((classification_result, recognition_results, image, db_image))
+                queue_results.put((classification_result, recognition_results, image, db_image, face_detected))
             else:
                 print("Skipping image")
-
 
     def add_image(self, db_image):
         print("Scheduling image with ID:", db_image.id)

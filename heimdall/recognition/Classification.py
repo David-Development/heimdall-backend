@@ -2,7 +2,7 @@ import datetime
 from heimdall.models.Gallery import Gallery
 from heimdall.models.ClassificationResults import ClassificationResults
 from heimdall.models.RecognitionResult import RecognitionResult
-from heimdall.tasks import classify
+from heimdall.tasks import classify, extract_bounding_boxes
 import numpy as np
 import base64
 import cv2
@@ -49,3 +49,10 @@ class Classification:
             timing_file.write(text)
 
         return classification_result, recognition_results
+
+
+    @staticmethod
+    def detect_faces(image):
+        bounding_boxes = extract_bounding_boxes(image)
+        print(bounding_boxes)
+        return len(bounding_boxes) > 0

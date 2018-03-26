@@ -596,6 +596,17 @@ def classify(classifier, image, dists=False, neighbors=None):
     return results, bbs
 
 
+def extract_bounding_boxes(image):
+    """
+    get bounding boxes for faces in images
+    :param image: The image to be classified
+    :param dists: For "kNN" as classifier, if a distance is given, return absolute distances to number of neighbors
+    :param neighbors: For "kNN" as classifier, the number of neighbors for which a distance should be returned
+    """
+    descriptors, bbs = recognizer.extract_descriptors(image)
+
+    return bbs
+
 
 
 # TODO remove method below!
