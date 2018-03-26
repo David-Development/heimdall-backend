@@ -60,7 +60,7 @@ class RecognitionManager:
         self.handler_thread.daemon = True
         self.handler_thread.start()
 
-    @debounce(120)  # time in seconds (120 = 2 minutes)
+    @debounce(300)  # time in seconds (120 = 2minutes, 300 = 5minutes)
     def clear_mqtt_channels(self):
         print("Clear MQTT Channel!!!")
         mqtt.publish("recognitions/person", payload=None, qos=0, retain=True)
