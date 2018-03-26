@@ -21,6 +21,8 @@ from heimdall.models.ClassifierStats import ClassifierStats
 import base64
 import cv2
 
+from heimdall.recognition.debounce import debounce
+
 
 app = None
 db = None
@@ -58,6 +60,11 @@ class RecognitionManager:
         self.handler_thread.daemon = True
         self.handler_thread.start()
 
+    @debounce(120)  # time in seconds (120 = 2 minutes)
+    def clear_mqtt_channels(self):
+        print("Clear MQTT Channel!!!")
+        mqtt.publish("recognitions/person", payload=None, qos=0, retain=True)
+        mqtt.publish("recognitions/image", payload=None, qos=0, retain=True)
 
     @staticmethod
     #@line_profiler
@@ -96,7 +103,9 @@ class RecognitionManager:
                           'img_path': db_image.path}
 
                 result = json.dumps(result)
+
                 mqtt.publish("recognitions/person", payload=result, qos=0, retain=True)
+                recognition_manager.clear_mqtt_channels()
 
                 '''
                 names_string = ",".join(names)
