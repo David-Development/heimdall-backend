@@ -28,4 +28,5 @@ class Gallery(db.Model):
         return self.images.count()
 
     def __repr__(self):
-        return '<Gallery %r>' % self.name
+        print(self.name, self.path, self.subject_gallery, self.createdate)
+        return '<Gallery {}>'.format(self.name)
