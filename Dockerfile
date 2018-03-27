@@ -12,9 +12,8 @@ FROM luhmer/opencv-python3
 #    #&& rm shape_predictor_68_face_landmarks.dat.bz2
 
 
-# TODO install lib-boost in the first step of the luhmer/opencv-python3
 RUN apt-get update \
-    && apt-get install -y git tzdata libboost-all-dev netcat \
+    && apt-get install -y git tzdata netcat \
     && rm -rf /var/lib/apt/lists/*
 
 # matplotlib config (used by benchmark)
