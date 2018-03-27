@@ -189,7 +189,7 @@ class ImageListRes(Resource):
     def get(self):
         return Image.query.all()
 
-    @cors.crossdomain(origin='*') # TODO remove cors header here...
+    @cors.crossdomain(origin='*')  # TODO remove cors header here...
     def put(self):
         """
         Move Images from one Gallery to another
@@ -427,9 +427,12 @@ def getPersonById(person_id):
             'name': gallery.name,
             'path': gallery.path,
             'subject_gallery': gallery.subject_gallery,
-            'images': getImagesForPerson(gallery.images),
-            'avatar': gallery.images.first().path
+            'images': getImagesForPerson(gallery.images)
         }
+        avatar = gallery.images.first()  # can be None if no image is in gallery
+        if avatar:
+            empDict['avatar'] = avatar.path
+
     return jsonify(empDict), 201
 
 
