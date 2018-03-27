@@ -72,10 +72,15 @@ def create_and_populate_gallery(base_path, gallery_name, subject_gallery=True):
 
     gallery_path = os.path.join(base_path, gallery_name)
 
-    if subject_gallery:
+    if subject_gallery or gallery_name == 'unknown':
         gallery_folder = os.path.join(config['SUBJECT_IMAGES_FOLDER'], gallery_name)
     else:
         gallery_folder = os.path.join(config['IMAGE_FOLDER'], gallery_name)
+
+    print("  ")
+    print(gallery_name)
+    print(gallery_path)
+    print(gallery_folder)
 
     gallery = Gallery(name=gallery_name, path=gallery_folder, subject_gallery=subject_gallery)
     db.session.add(gallery)
@@ -200,8 +205,10 @@ def move_images(gallery, images):
     dest_gallery_path = os.path.join(basedir, gallery.path)
 
     for image in images:
-        image_path = os.path.join(basedir, image.path)
-        shutil.move(image_path, os.path.join(dest_gallery_path, image.name))
+        src_image_path = os.path.join(basedir, image.path)
+        dst_image_path = os.path.join(dest_gallery_path, image.name)
+        print("Moving image from: {} to: {}".format(src_image_path, dst_image_path))
+        shutil.move(src_image_path, dst_image_path)
 
 
 def download_models(self):
