@@ -1,4 +1,4 @@
-FROM luhmer/opencv-python3
+FROM luhmer/opencv-python3:v3.4.1
 
 #WORKDIR /app/
 
