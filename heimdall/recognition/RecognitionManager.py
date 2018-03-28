@@ -106,42 +106,26 @@ class RecognitionManager:
 
                 mqtt.publish("recognitions/person", payload=result, qos=0, retain=True)
                 recognition_manager.clear_mqtt_channels()
-
-                '''
-                names_string = ",".join(names)
-                print("Names:", names_string)
-
-                
-                # Update user-variable
-                domoticz = {'idx': 1,
-                            'command': 'setuservariable',
-                            'value': names_string }
-                mqtt.publish("domoticz/in", payload=json.dumps(domoticz), qos=0, retain=True)
-
-                # update virtual sensor
-                domoticz = {'idx': 1,
-                            'nvalue': 0,
-                            'svalue': names_string }
-                mqtt.publish("domoticz/in", payload=json.dumps(domoticz), qos=0, retain=True)
-                
-                mqtt.publish("recognitions/personname", payload=names_string, qos=0, retain=True)
-                '''
             if not recognition_results and not classification_result:
                 print("Classifier trained yet?")
                 if not face_detected:
                     print("No face detected.. Deleting image")
                     RecognitionManager.delete_image(db_image)
+                else:
+                    print("Face detected.. Keeping image")
             elif not recognition_results:
                 print("No face detected.. Deleting image")
                 RecognitionManager.delete_image(db_image)
 
-            #print(recognition_results)
-            #print(classification_result)
+            #print("recognition_results:", recognition_results)
+            #print("classification_result:", classification_result)
 
             db.session.commit()
 
             
-            if recognition_results or classification_result is None: # Send if face was detected or if an error occured
+            # recognition_results is true if the system actually detected someone (when the classifier is trained)
+            # face_detected is true if the classifier is not trained yet but a face was detected
+            if recognition_results or face_detected:
                 # Send image (as base64) via MQTT
                 mqtt.publish("recognitions/image", payload=image_to_base64(image), qos=0, retain=True)
                 
@@ -183,10 +167,9 @@ class RecognitionManager:
             if image is None:
                 raise AssertionError('Image was None / empty')
 
-            if classifier_stats is None:  # Classifier is not trained!
+            if classifier_stats is None:  # Classifier is not trained - detect faces only
                 face_detected = Classification.detect_faces(image)
-                print(face_detected)
-            else:
+            else: # Classifier is trained.. detect and recognize faces
                 classification_result, recognition_results = Classification.classify_db_image(
                     classifier=classifier,
                     classifier_stats=classifier_stats,
