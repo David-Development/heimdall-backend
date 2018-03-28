@@ -663,12 +663,12 @@ def new_live_image():
     filename = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')[:-3]) + '.jpg'
     db_image = new_image(image, filename)
 
-    latest_clf = ClassifierStats.query.order_by(ClassifierStats.date.desc()).first()
-    if latest_clf:
-        recognition_manager.add_image(db_image=db_image)
-        return jsonify({'message': 'Image processed'}), 200
-    else:
-        return jsonify({'message': 'No classifier present!'}), 500
+    #latest_clf = ClassifierStats.query.order_by(ClassifierStats.date.desc()).first()
+    #if latest_clf:
+    recognition_manager.add_image(db_image=db_image)
+    return jsonify({'message': 'Image processed'}), 200
+    #else:
+    #    return jsonify({'message': 'No classifier present!'}), 500
 
 
 @app.route("/api/recognizer/train/status")
