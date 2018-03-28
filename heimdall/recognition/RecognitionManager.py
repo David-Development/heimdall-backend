@@ -180,9 +180,9 @@ class RecognitionManager:
                     labels_gallery_dict=labels_gallery_dict
                 )
 
-                face_detected = classification_result is None  # TODO check if this is correct!!
-                print("Class: ", classification_result)
-                print("Rec: ", recognition_results)
+                face_detected = True if recognition_results else False
+                #print("Class: ", classification_result)
+                #print("Rec: ", recognition_results)
                 print("Face detected: ", face_detected)
         except Exception as e:
             print("Exception: ", e)
