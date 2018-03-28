@@ -54,5 +54,5 @@ class Classification:
     @staticmethod
     def detect_faces(image):
         bounding_boxes = extract_bounding_boxes(image)
-        print(bounding_boxes)
+        # print("Bounding Boxes:", bounding_boxes)
         return len(bounding_boxes) > 0
